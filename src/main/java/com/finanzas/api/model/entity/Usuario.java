@@ -8,9 +8,9 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "usuarios")
-@Data // Lombok: Genera getters, setters, toString, etc.
-@NoArgsConstructor // Lombok: Constructor vacío requerido por JPA
-@AllArgsConstructor // Lombok: Constructor con todos los argumentos
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class Usuario {
 
     @Id
@@ -23,9 +23,21 @@ public class Usuario {
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
-    @Column(nullable = false)
-    private String oficio;
+    // Cambiado de oficio a nombre
+    @Column
+    private String nombre;
 
     @Column(name = "fecha_registro")
     private LocalDateTime fechaRegistro = LocalDateTime.now();
+
+    // NUEVOS CAMPOS PARA SEGURIDAD OTP
+    @Column(name = "codigo_otp", length = 4)
+    private String codigoOtp;
+
+    @Column(name = "expiracion_otp")
+    private LocalDateTime expiracionOtp;
+
+    // Este campo guardará "BODEGA", "TAXI", "FREELANCE" o "PERSONALIZADO"
+    @Column(name = "tipo_negocio")
+    private String tipoNegocio;
 }

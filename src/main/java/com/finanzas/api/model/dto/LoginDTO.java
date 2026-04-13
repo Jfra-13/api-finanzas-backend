@@ -1,10 +1,8 @@
 package com.finanzas.api.model.dto;
-
 import lombok.Data;
 
 @Data
-public class UsuarioRegistroDTO {
-    private String nombre;
+public class LoginDTO {
     private String email;
     private String password;
 }
