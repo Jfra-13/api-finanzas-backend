@@ -24,7 +24,4 @@ public class TransaccionRegistroDTO {
     private String descripcion;
 
     private LocalDateTime fecha;
-
-    @NotNull(message = "{usuarioId.notnull}")
-    private Long usuarioId;
 }

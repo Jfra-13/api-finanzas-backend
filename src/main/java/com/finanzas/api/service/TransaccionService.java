@@ -36,10 +36,8 @@ public class TransaccionService {
         this.metaService = metaService;
     }
 
-    public Transaccion registrar(TransaccionRegistroDTO dto) {
-        Usuario usuario = usuarioRepository.findById(dto.getUsuarioId())
-                .orElseThrow(() -> new com.finanzas.api.exception.specific.UsuarioNoEncontradoException());
-
+    @org.springframework.transaction.annotation.Transactional
+    public Transaccion registrar(Usuario usuario, TransaccionRegistroDTO dto) {
         Transaccion nuevaTransaccion = new Transaccion();
         nuevaTransaccion.setMonto(dto.getMonto());
         nuevaTransaccion.setTipo(dto.getTipo().toUpperCase());

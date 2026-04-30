@@ -26,7 +26,7 @@ Content-Type: application/json
 }
 
 ### 1.3 Registro Fallido (Tipo de Negocio Inválido)
-# Espera: 400 Bad Request - code: "MALFORMED_JSON" (por error de deserialización de Enum)
+# Espera: 400 Bad Request - code: "MALFORMED_JSON" o "VALIDATION_ERROR"
 POST http://localhost:9090/api/v1/usuarios/registro
 Content-Type: application/json
 
@@ -57,7 +57,6 @@ Content-Type: application/json
 
 ### 2.1 Login Exitoso (Obtener Token)
 # Espera: 200 OK - code: "LOGIN_SUCCESS"
-# El token ahora viene dentro de .data.token
 POST http://localhost:9090/api/v1/usuarios/login
 Content-Type: application/json
 
@@ -103,6 +102,7 @@ Authorization: Bearer token-totalmente-inventado
 
 ### 4.1 Registrar Transacción Exitosa
 # Espera: 200 OK - code: "TRANSACTION_CREATED"
+# Nota: Ya no enviamos usuarioId, el backend lo toma del Token
 POST http://localhost:9090/api/v1/finanzas/transacciones
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -161,7 +161,7 @@ Content-Type: application/json
 }
 
 ### 5.2 Actualizar Negocio Fallido (Enum incorrecto)
-# Espera: 400 Bad Request - code: "MALFORMED_JSON"
+# Espera: 400 Bad Request - code: "MALFORMED_JSON" o "VALIDATION_ERROR"
 PUT http://localhost:9090/api/v1/usuarios/me/negocio
 Authorization: Bearer {{token}}
 Content-Type: application/json

@@ -27,8 +27,7 @@ public class TransaccionController {
     public ResponseEntity<ApiResponseDTO<String>> registrarTransaccion(
             @AuthenticationPrincipal UsuarioPrincipal userPrincipal,
             @Valid @RequestBody TransaccionRegistroDTO dto) {
-        dto.setUsuarioId(userPrincipal.getUsuario().getId());
-        transaccionService.registrar(dto);
+        transaccionService.registrar(userPrincipal.getUsuario(), dto);
         return ResponseEntity.ok(ApiResponseDTO.success(200, "TRANSACTION_CREATED", "¡Transacción guardada exitosamente!", null, "/api/v1/finanzas/transacciones"));
     }
 

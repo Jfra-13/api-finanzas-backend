@@ -32,7 +32,6 @@ build/
 ### VS Code ###
 .vscode/
 
-
 # ==========================================
 # ARCHIVOS SENSIBLES - NUNCA VERSIONAR
 # ==========================================
@@ -46,3 +45,9 @@ src/main/resources/application-*.properties
 *.p12
 *.jks
 *.keystore
+
+# ==========================================
+# BASES DE DATOS LOCALES (H2, SQLite, etc.)
+# ==========================================
+*.mv.db
+*.trace.db
