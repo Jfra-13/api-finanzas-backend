@@ -1,5 +1,6 @@
 package com.finanzas.api.controller;
-
+import com.finanzas.api.model.dto.DiaResumenDTO;
+import java.util.List;
 import com.finanzas.api.model.dto.TransaccionRegistroDTO;
 import com.finanzas.api.service.TransaccionService;
 import org.springframework.http.ResponseEntity;
@@ -51,4 +52,15 @@ public class TransaccionController {
             return ResponseEntity.badRequest().body(BigDecimal.ZERO);
         }
     }
+
+    @GetMapping("/resumen-semanal/{usuarioId}")
+    public ResponseEntity<List<DiaResumenDTO>> consultarResumenSemanal(@PathVariable Long usuarioId) {
+        try {
+            List<DiaResumenDTO> resumen = transaccionService.obtenerResumenSemanal(usuarioId);
+            return ResponseEntity.ok(resumen);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
 }

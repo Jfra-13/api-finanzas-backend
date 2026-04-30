@@ -23,4 +23,12 @@ public interface TransaccionRepository extends JpaRepository<Transaccion, Long> 
             @Param("inicioDia") java.time.LocalDateTime inicioDia,
             @Param("finDia") java.time.LocalDateTime finDia
     );
+
+    // 👇 NUEVA CONSULTA: Trae todas las transacciones de una semana específica
+    @Query("SELECT t FROM Transaccion t WHERE t.usuario.id = :usuarioId AND t.fecha >= :inicioSemana AND t.fecha < :finSemana")
+    java.util.List<Transaccion> obtenerTransaccionesPorRango(
+            @Param("usuarioId") Long usuarioId,
+            @Param("inicioSemana") java.time.LocalDateTime inicioSemana,
+            @Param("finSemana") java.time.LocalDateTime finSemana
+    );
 }

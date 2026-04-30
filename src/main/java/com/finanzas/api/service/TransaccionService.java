@@ -7,6 +7,14 @@ import com.finanzas.api.repository.TransaccionRepository;
 import com.finanzas.api.repository.UsuarioRepository;
 import org.springframework.stereotype.Service;
 
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.temporal.TemporalAdjusters;
+import java.util.ArrayList;
+import java.util.List;
+import com.finanzas.api.model.dto.DiaResumenDTO;
+
 import java.math.BigDecimal;
 
 @Service
@@ -56,4 +64,39 @@ public class TransaccionService {
 
         return transaccionRepository.sumarIngresosDeHoy(usuarioId, inicioDia, finDia);
     }
+
+    public List<DiaResumenDTO> obtenerResumenSemanal(Long usuarioId) {
+        // 1. Calculamos las fechas: Desde el Lunes a las 00:00 hasta el Domingo a las 23:59
+        LocalDate hoy = LocalDate.now();
+        LocalDateTime inicioSemana = hoy.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).atStartOfDay();
+        LocalDateTime finSemana = hoy.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY)).plusDays(1).atStartOfDay();
+
+        // 2. Traemos todas las transacciones de esa semana
+        List<Transaccion> transacciones = transaccionRepository.obtenerTransaccionesPorRango(usuarioId, inicioSemana, finSemana);
+
+        // 3. Preparamos nuestras 7 "cajas" de días vacías
+        List<DiaResumenDTO> resumen = new ArrayList<>();
+        String[] nombresDias = {"Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"};
+
+        for (String nombreDia : nombresDias) {
+            resumen.add(new DiaResumenDTO(nombreDia, BigDecimal.ZERO, BigDecimal.ZERO));
+        }
+
+        // 4. Clasificamos cada transacción en la caja correcta
+        for (Transaccion t : transacciones) {
+            // getDayOfWeek().getValue() devuelve 1 para Lunes, 7 para Domingo.
+            // Restamos 1 para que encaje en el índice de nuestra lista (0 a 6).
+            int indexDia = t.getFecha().getDayOfWeek().getValue() - 1;
+            DiaResumenDTO diaDto = resumen.get(indexDia);
+
+            if ("INGRESO".equalsIgnoreCase(t.getTipo())) {
+                diaDto.setIngresos(diaDto.getIngresos().add(t.getMonto()));
+            } else if ("EGRESO".equalsIgnoreCase(t.getTipo())) {
+                diaDto.setEgresos(diaDto.getEgresos().add(t.getMonto()));
+            }
+        }
+
+        return resumen;
+    }
+
 }
