@@ -15,6 +15,12 @@ import java.util.ArrayList;
 import java.util.List;
 import com.finanzas.api.model.dto.DiaResumenDTO;
 
+import com.finanzas.api.model.dto.ProgresoMetasDTO;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.temporal.TemporalAdjusters;
+
 import java.math.BigDecimal;
 
 @Service
@@ -97,6 +103,41 @@ public class TransaccionService {
         }
 
         return resumen;
+    }
+
+    public ProgresoMetasDTO obtenerProgresoMetas(Long usuarioId, BigDecimal metaMensual, int diasRestantes) {
+        ProgresoMetasDTO progreso = new ProgresoMetasDTO();
+
+        // 1. CÁLCULO DIARIO
+        LocalDateTime inicioDia = LocalDate.now().atStartOfDay();
+        LocalDateTime finDia = inicioDia.plusDays(1);
+        // Reutilizamos tu consulta del MVP 2 (aunque se llame "DeHoy", funciona con cualquier rango)
+        BigDecimal ingresoDiario = transaccionRepository.sumarIngresosDeHoy(usuarioId, inicioDia, finDia);
+        BigDecimal metaDiaria = obtenerCuotaDiaria(usuarioId, metaMensual, diasRestantes);
+
+        // 2. CÁLCULO SEMANAL
+        LocalDateTime inicioSemana = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).atStartOfDay();
+        LocalDateTime finSemana = inicioSemana.plusDays(7);
+        BigDecimal ingresoSemanal = transaccionRepository.sumarIngresosDeHoy(usuarioId, inicioSemana, finSemana);
+        // Si tu meta diaria es X, tu meta semanal esperada es X * 7
+        BigDecimal metaSemanal = metaDiaria.multiply(BigDecimal.valueOf(7));
+
+        // 3. CÁLCULO MENSUAL
+        LocalDateTime inicioMes = LocalDate.now().withDayOfMonth(1).atStartOfDay();
+        LocalDateTime finMes = inicioMes.plusMonths(1);
+        BigDecimal ingresoMensual = transaccionRepository.sumarIngresosDeHoy(usuarioId, inicioMes, finMes);
+
+        // 4. EMPAQUETAMOS TODO
+        progreso.setIngresoDiario(ingresoDiario);
+        progreso.setMetaDiaria(metaDiaria);
+
+        progreso.setIngresoSemanal(ingresoSemanal);
+        progreso.setMetaSemanal(metaSemanal);
+
+        progreso.setIngresoMensual(ingresoMensual);
+        progreso.setMetaMensual(metaMensual);
+
+        return progreso;
     }
 
 }

@@ -1,0 +1,60 @@
+### 1. REGISTRAR USUARIO (Público)
+POST http://localhost:9090/api/v1/usuarios/registro
+Content-Type: application/json
+
+{
+  "nombre": "Juan Francisco",
+  "email": "juan@test.com",
+  "password": "password123"
+}
+
+###
+
+### 2. INICIAR SESIÓN (Login para obtener el Token)
+# @name login
+POST http://localhost:9090/api/v1/usuarios/login
+Content-Type: application/json
+
+{
+  "email": "juan@test.com",
+  "password": "password123"
+}
+
+### Guardar el token de la respuesta anterior
+@token = {{login.response.body.token}}
+
+###
+
+### 3. PROBAR RUTA PROTEGIDA SIN TOKEN (Debe dar Error 403 o 401)
+GET http://localhost:9090/api/v1/finanzas/hoy
+
+###
+
+### 4. REGISTRAR TRANSACCIÓN (Con Token)
+# Nota: Ya NO enviamos usuarioId, el backend lo sabe por el Token
+POST http://localhost:9090/api/v1/finanzas/transacciones
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "monto": 150.50,
+  "tipo": "INGRESO"
+}
+
+###
+
+### 5. CONSULTAR RESUMEN SEMANAL (Con Token)
+# Ruta: /api/v1/finanzas/resumen-semanal (sin ID al final)
+GET http://localhost:9090/api/v1/finanzas/resumen-semanal
+Authorization: Bearer {{token}}
+
+###
+
+### 6. ACTUALIZAR TIPO DE NEGOCIO (Ruta Privada)
+PUT http://localhost:9090/api/v1/usuarios/me/negocio
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "tipoNegocio": "TAXI"
+}

@@ -31,3 +31,18 @@ build/
 
 ### VS Code ###
 .vscode/
+
+
+# ==========================================
+# ARCHIVOS SENSIBLES - NUNCA VERSIONAR
+# ==========================================
+src/main/resources/application.properties
+src/main/resources/application-*.properties
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
