@@ -5,6 +5,7 @@ import com.finanzas.api.model.entity.Usuario;
 import com.finanzas.api.repository.UsuarioRepository;
 import com.finanzas.api.security.JwtService;
 import com.finanzas.api.security.UsuarioPrincipal;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -39,9 +40,9 @@ public class UsuarioController {
 
     // 1. REGISTRO CORREGIDO
     @PostMapping("/registro")
-    public ResponseEntity<String> registrarUsuario(@RequestBody UsuarioRegistroDTO dto) {
+    public ResponseEntity<ApiResponseDTO<String>> registrarUsuario(@Valid @RequestBody UsuarioRegistroDTO dto) {
         if (usuarioRepository.findByEmail(dto.getEmail()).isPresent()) {
-            return ResponseEntity.badRequest().body("El email ya está registrado");
+            throw new com.finanzas.api.exception.specific.EmailDuplicadoException();
         }
 
         Usuario nuevoUsuario = new Usuario();
@@ -50,12 +51,12 @@ public class UsuarioController {
         nuevoUsuario.setPasswordHash(passwordEncoder.encode(dto.getPassword()));
 
         usuarioRepository.save(nuevoUsuario);
-        return ResponseEntity.ok("¡Usuario registrado con éxito!");
+        return ResponseEntity.ok(ApiResponseDTO.success(200, "USER_REGISTERED", "¡Usuario registrado con éxito!", null, "/api/v1/usuarios/registro"));
     }
 
     // 2. LOGIN
     @PostMapping("/login")
-    public ResponseEntity<?> iniciarSesion(@RequestBody LoginDTO dto) {
+    public ResponseEntity<ApiResponseDTO<LoginResponseDTO>> iniciarSesion(@Valid @RequestBody LoginDTO dto) {
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(dto.getEmail(), dto.getPassword())
         );
@@ -72,16 +73,16 @@ public class UsuarioController {
                 .tipoNegocio(usuario.getTipoNegocio())
                 .build();
 
-        return ResponseEntity.ok(responseDTO);
+        return ResponseEntity.ok(ApiResponseDTO.success(200, "LOGIN_SUCCESS", "Login exitoso", responseDTO, "/api/v1/usuarios/login"));
     }
 
     // 3. GENERAR Y ENVIAR OTP
     @PostMapping("/forgot-password")
-    public ResponseEntity<?> forgotPassword(@RequestBody ForgotPasswordDTO dto) {
+    public ResponseEntity<ApiResponseDTO<String>> forgotPassword(@Valid @RequestBody ForgotPasswordDTO dto) {
         Optional<Usuario> userOpt = usuarioRepository.findByEmail(dto.getEmail());
         if (userOpt.isEmpty()) {
             // Por seguridad, se suele responder OK incluso si no existe, para no revelar correos registrados.
-            return ResponseEntity.ok("Si el correo existe, se enviará un código.");
+            return ResponseEntity.ok(ApiResponseDTO.success(200, "OTP_SENT", "Si el correo existe, se enviará un código.", null, "/api/v1/usuarios/forgot-password"));
         }
 
         Usuario usuario = userOpt.get();
@@ -100,39 +101,39 @@ public class UsuarioController {
         message.setText("Tu código de verificación de 4 dígitos es: " + otp + "\n\nEste código expirará en 10 minutos.");
         mailSender.send(message);
 
-        return ResponseEntity.ok("Código enviado exitosamente");
+        return ResponseEntity.ok(ApiResponseDTO.success(200, "OTP_SENT", "Código enviado exitosamente", null, "/api/v1/usuarios/forgot-password"));
     }
 
     // 4. VERIFICAR OTP
     @PostMapping("/verify-otp")
-    public ResponseEntity<?> verifyOtp(@RequestBody VerifyOtpDTO dto) {
-        Optional<Usuario> userOpt = usuarioRepository.findByEmail(dto.getEmail());
-        if (userOpt.isEmpty()) return ResponseEntity.badRequest().body("Usuario no encontrado");
-
-        Usuario usuario = userOpt.get();
+    public ResponseEntity<ApiResponseDTO<String>> verifyOtp(@Valid @RequestBody VerifyOtpDTO dto) {
+        Usuario usuario = usuarioRepository.findByEmail(dto.getEmail())
+                .orElseThrow(() -> new com.finanzas.api.exception.specific.UsuarioNoEncontradoException());
 
         if (usuario.getCodigoOtp() == null || !usuario.getCodigoOtp().equals(dto.getOtp())) {
-            return ResponseEntity.badRequest().body("Código incorrecto");
+            throw new com.finanzas.api.exception.specific.OtpInvalidoException();
         }
 
         if (usuario.getExpiracionOtp().isBefore(LocalDateTime.now())) {
-            return ResponseEntity.badRequest().body("El código ha expirado");
+            throw new com.finanzas.api.exception.specific.OtpExpiradoException();
         }
 
-        return ResponseEntity.ok("Código verificado correctamente");
+        return ResponseEntity.ok(ApiResponseDTO.success(200, "OTP_VERIFIED", "Código verificado correctamente", null, "/api/v1/usuarios/verify-otp"));
     }
 
     // 5. ESTABLECER NUEVA CONTRASEÑA
     @PostMapping("/reset-password")
-    public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordDTO dto) {
-        Optional<Usuario> userOpt = usuarioRepository.findByEmail(dto.getEmail());
-        if (userOpt.isEmpty()) return ResponseEntity.badRequest().body("Usuario no encontrado");
-
-        Usuario usuario = userOpt.get();
+    public ResponseEntity<ApiResponseDTO<String>> resetPassword(@Valid @RequestBody ResetPasswordDTO dto) {
+        Usuario usuario = usuarioRepository.findByEmail(dto.getEmail())
+                .orElseThrow(() -> new com.finanzas.api.exception.specific.UsuarioNoEncontradoException());
 
         // Doble validación de seguridad
-        if (usuario.getCodigoOtp() == null || !usuario.getCodigoOtp().equals(dto.getOtp()) || usuario.getExpiracionOtp().isBefore(LocalDateTime.now())) {
-            return ResponseEntity.badRequest().body("Código inválido o expirado");
+        if (usuario.getCodigoOtp() == null || !usuario.getCodigoOtp().equals(dto.getOtp())) {
+            throw new com.finanzas.api.exception.specific.OtpInvalidoException();
+        }
+
+        if (usuario.getExpiracionOtp().isBefore(LocalDateTime.now())) {
+            throw new com.finanzas.api.exception.specific.OtpExpiradoException();
         }
 
         // Encriptar y guardar nueva contraseña
@@ -144,18 +145,18 @@ public class UsuarioController {
 
         usuarioRepository.save(usuario);
 
-        return ResponseEntity.ok("Contraseña actualizada exitosamente");
+        return ResponseEntity.ok(ApiResponseDTO.success(200, "PASSWORD_RESET_SUCCESS", "Contraseña actualizada exitosamente", null, "/api/v1/usuarios/reset-password"));
     }
 
     // 6. ACTUALIZAR TIPO DE NEGOCIO
     @PutMapping("/me/negocio")
-    public ResponseEntity<?> actualizarNegocio(
+    public ResponseEntity<ApiResponseDTO<String>> actualizarNegocio(
             @AuthenticationPrincipal UsuarioPrincipal userPrincipal,
-            @RequestBody NegocioUpdateDTO dto) {
+            @Valid @RequestBody NegocioUpdateDTO dto) {
         Usuario usuario = userPrincipal.getUsuario();
         usuario.setTipoNegocio(dto.getTipoNegocio());
         usuarioRepository.save(usuario);
 
-        return ResponseEntity.ok("Negocio actualizado a: " + dto.getTipoNegocio());
+        return ResponseEntity.ok(ApiResponseDTO.success(200, "BUSINESS_UPDATED", "Negocio actualizado a: " + dto.getTipoNegocio(), null, "/api/v1/usuarios/me/negocio"));
     }
 }

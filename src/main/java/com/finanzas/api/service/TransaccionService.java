@@ -38,7 +38,7 @@ public class TransaccionService {
 
     public Transaccion registrar(TransaccionRegistroDTO dto) {
         Usuario usuario = usuarioRepository.findById(dto.getUsuarioId())
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new com.finanzas.api.exception.specific.UsuarioNoEncontradoException());
 
         Transaccion nuevaTransaccion = new Transaccion();
         nuevaTransaccion.setMonto(dto.getMonto());

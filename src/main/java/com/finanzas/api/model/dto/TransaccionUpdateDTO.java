@@ -11,7 +11,10 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
-public class TransaccionRegistroDTO {
+public class TransaccionUpdateDTO {
+    @NotNull(message = "{id.notnull}")
+    private Long id;
+
     @NotNull(message = "{monto.notnull}")
     @DecimalMin(value = "0.01", message = "{monto.min}")
     private BigDecimal monto;
@@ -24,7 +27,4 @@ public class TransaccionRegistroDTO {
     private String descripcion;
 
     private LocalDateTime fecha;
-
-    @NotNull(message = "{usuarioId.notnull}")
-    private Long usuarioId;
 }

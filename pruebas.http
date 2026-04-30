@@ -1,17 +1,63 @@
-### 1. REGISTRAR USUARIO (Público)
+### =================================================================
+### 1. REGISTRO DE USUARIOS
+### =================================================================
+
+### 1.1 Registro Exitoso
+# Espera: 200 OK - code: "USER_REGISTERED"
 POST http://localhost:9090/api/v1/usuarios/registro
 Content-Type: application/json
 
 {
   "nombre": "Juan Francisco",
   "email": "juan@test.com",
-  "password": "password123"
+  "password": "password123",
+  "tipoNegocio": "TAXI"
+}
+
+### 1.2 Registro Fallido (Validación de campos vacíos y formato)
+# Espera: 400 Bad Request - code: "VALIDATION_ERROR"
+POST http://localhost:9090/api/v1/usuarios/registro
+Content-Type: application/json
+
+{
+  "nombre": "",
+  "email": "correo-invalido",
+  "password": "123"
+}
+
+### 1.3 Registro Fallido (Tipo de Negocio Inválido)
+# Espera: 400 Bad Request - code: "MALFORMED_JSON" (por error de deserialización de Enum)
+POST http://localhost:9090/api/v1/usuarios/registro
+Content-Type: application/json
+
+{
+  "nombre": "Prueba Negocio",
+  "email": "negocio@test.com",
+  "password": "password123",
+  "tipoNegocio": "NASA"
+}
+
+### 1.4 Registro Fallido (Email Duplicado)
+# Espera: 422 Unprocessable Entity - code: "EMAIL_ALREADY_EXISTS"
+POST http://localhost:9090/api/v1/usuarios/registro
+Content-Type: application/json
+
+{
+  "nombre": "Juan Repetido",
+  "email": "juan@test.com",
+  "password": "password123",
+  "tipoNegocio": "BODEGA"
 }
 
 ###
 
-### 2. INICIAR SESIÓN (Login para obtener el Token)
-# @name login
+### =================================================================
+### 2. AUTENTICACIÓN (LOGIN)
+### =================================================================
+
+### 2.1 Login Exitoso (Obtener Token)
+# Espera: 200 OK - code: "LOGIN_SUCCESS"
+# El token ahora viene dentro de .data.token
 POST http://localhost:9090/api/v1/usuarios/login
 Content-Type: application/json
 
@@ -20,41 +66,153 @@ Content-Type: application/json
   "password": "password123"
 }
 
-### Guardar el token de la respuesta anterior
-@token = {{login.response.body.token}}
+> {%
+    client.global.set("token", response.body.data.token);
+%}
+
+### 2.2 Login Fallido (Credenciales incorrectas)
+# Espera: 401 Unauthorized - code: "UNAUTHORIZED"
+POST http://localhost:9090/api/v1/usuarios/login
+Content-Type: application/json
+
+{
+  "email": "juan@test.com",
+  "password": "error_password"
+}
 
 ###
 
-### 3. PROBAR RUTA PROTEGIDA SIN TOKEN (Debe dar Error 403 o 401)
+### =================================================================
+### 3. SEGURIDAD Y RUTAS PROTEGIDAS
+### =================================================================
+
+### 3.1 Acceso sin Token
+# Espera: 401 Unauthorized - code: "UNAUTHORIZED"
 GET http://localhost:9090/api/v1/finanzas/hoy
 
+### 3.2 Acceso con Token Inválido/Malformado
+# Espera: 401 Unauthorized - code: "UNAUTHORIZED"
+GET http://localhost:9090/api/v1/finanzas/hoy
+Authorization: Bearer token-totalmente-inventado
+
 ###
 
-### 4. REGISTRAR TRANSACCIÓN (Con Token)
-# Nota: Ya NO enviamos usuarioId, el backend lo sabe por el Token
+### =================================================================
+### 4. TRANSACCIONES Y CONSULTAS FINANCIERAS (Requiere Token)
+### =================================================================
+
+### 4.1 Registrar Transacción Exitosa
+# Espera: 200 OK - code: "TRANSACTION_CREATED"
 POST http://localhost:9090/api/v1/finanzas/transacciones
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
   "monto": 150.50,
+  "tipo": "INGRESO",
+  "descripcion": "Venta de servicios"
+}
+
+### 4.2 Registrar Transacción Fallida (Monto negativo)
+# Espera: 400 Bad Request - code: "VALIDATION_ERROR"
+POST http://localhost:9090/api/v1/finanzas/transacciones
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "monto": -50.0,
   "tipo": "INGRESO"
 }
 
-###
+### 4.3 Consultar Cuota Diaria
+# Espera: 200 OK - code: "DAILY_QUOTA_OK"
+GET http://localhost:9090/api/v1/finanzas/cuota-diaria?meta=3000&dias=30
+Authorization: Bearer {{token}}
 
-### 5. CONSULTAR RESUMEN SEMANAL (Con Token)
-# Ruta: /api/v1/finanzas/resumen-semanal (sin ID al final)
+### 4.4 Consultar Ingresos de Hoy
+# Espera: 200 OK - code: "TODAY_INCOME_OK"
+GET http://localhost:9090/api/v1/finanzas/hoy
+Authorization: Bearer {{token}}
+
+### 4.5 Consultar Resumen Semanal
+# Espera: 200 OK - code: "WEEKLY_SUMMARY_OK"
 GET http://localhost:9090/api/v1/finanzas/resumen-semanal
+Authorization: Bearer {{token}}
+
+### 4.6 Consultar Progreso de Metas
+# Espera: 200 OK - code: "GOALS_PROGRESS_OK"
+GET http://localhost:9090/api/v1/finanzas/progreso-metas?meta=5000&dias=30
 Authorization: Bearer {{token}}
 
 ###
 
-### 6. ACTUALIZAR TIPO DE NEGOCIO (Ruta Privada)
+### =================================================================
+### 5. GESTIÓN DE PERFIL Y NEGOCIO
+### =================================================================
+
+### 5.1 Actualizar Negocio Exitoso
+# Espera: 200 OK - code: "BUSINESS_UPDATED"
 PUT http://localhost:9090/api/v1/usuarios/me/negocio
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "tipoNegocio": "TAXI"
+  "tipoNegocio": "RESTAURANTE"
+}
+
+### 5.2 Actualizar Negocio Fallido (Enum incorrecto)
+# Espera: 400 Bad Request - code: "MALFORMED_JSON"
+PUT http://localhost:9090/api/v1/usuarios/me/negocio
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "tipoNegocio": "INVENTADO"
+}
+
+###
+
+### =================================================================
+### 6. RECUPERACIÓN DE CONTRASEÑA (FLUJO OTP)
+### =================================================================
+
+### 6.1 Solicitar código OTP (Email inexistente)
+# Espera: 200 OK - code: "OTP_SENT" (Por seguridad no revela si existe)
+POST http://localhost:9090/api/v1/usuarios/forgot-password
+Content-Type: application/json
+
+{
+  "email": "no-existo@test.com"
+}
+
+### 6.2 Verificar OTP (Código Erróneo)
+# Espera: 422 Unprocessable Entity - code: "INVALID_OTP"
+POST http://localhost:9090/api/v1/usuarios/verify-otp
+Content-Type: application/json
+
+{
+  "email": "juan@test.com",
+  "otp": "9999"
+}
+
+### 6.3 Resetear Contraseña (Validación de Password Débil)
+# Espera: 400 Bad Request - code: "VALIDATION_ERROR"
+POST http://localhost:9090/api/v1/usuarios/reset-password
+Content-Type: application/json
+
+{
+  "email": "juan@test.com",
+  "otp": "1234",
+  "newPassword": "123"
+}
+
+### 6.4 Resetear Contraseña (Usuario no encontrado)
+# Espera: 404 Not Found - code: "USER_NOT_FOUND"
+POST http://localhost:9090/api/v1/usuarios/reset-password
+Content-Type: application/json
+
+{
+  "email": "fantasma@test.com",
+  "otp": "1234",
+  "newPassword": "password123"
 }
