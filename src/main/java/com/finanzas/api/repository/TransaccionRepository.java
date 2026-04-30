@@ -12,7 +12,15 @@ import java.util.Optional;
 @Repository
 public interface TransaccionRepository extends JpaRepository<Transaccion, Long> {
 
-    // Magia de JPA: Suma automáticamente todos los ingresos de un usuario
+
     @Query("SELECT SUM(t.monto) FROM Transaccion t WHERE t.usuario.id = :usuarioId AND t.tipo = 'INGRESO'")
     Optional<BigDecimal> sumarIngresosPorUsuario(@Param("usuarioId") Long usuarioId);
+
+    // 👇 NUEVA CONSULTA: Solo suma los ingresos de un día específico
+    @Query("SELECT COALESCE(SUM(t.monto), 0) FROM Transaccion t WHERE t.usuario.id = :usuarioId AND t.tipo = 'INGRESO' AND t.fecha >= :inicioDia AND t.fecha < :finDia")
+    BigDecimal sumarIngresosDeHoy(
+            @Param("usuarioId") Long usuarioId,
+            @Param("inicioDia") java.time.LocalDateTime inicioDia,
+            @Param("finDia") java.time.LocalDateTime finDia
+    );
 }

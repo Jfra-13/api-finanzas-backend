@@ -40,4 +40,15 @@ public class TransaccionController {
             return ResponseEntity.badRequest().body(BigDecimal.ZERO);
         }
     }
+
+
+    @GetMapping("/hoy/{usuarioId}")
+    public ResponseEntity<BigDecimal> consultarIngresosHoy(@PathVariable Long usuarioId) {
+        try {
+            BigDecimal gananciaHoy = transaccionService.obtenerIngresosHoy(usuarioId);
+            return ResponseEntity.ok(gananciaHoy);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(BigDecimal.ZERO);
+        }
+    }
 }

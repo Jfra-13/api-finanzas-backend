@@ -34,7 +34,6 @@ public class TransaccionService {
         return transaccionRepository.save(nuevaTransaccion);
     }
 
-    // NUEVA FUNCIÓN: Calcula la cuota en tiempo real (¡Ahora con ganancia extra!)
     public BigDecimal obtenerCuotaDiaria(Long usuarioId, BigDecimal metaMensual, int diasRestantes) {
         BigDecimal utilidadActual = transaccionRepository.sumarIngresosPorUsuario(usuarioId)
                 .orElse(BigDecimal.ZERO);
@@ -49,5 +48,12 @@ public class TransaccionService {
 
         // Si todavía falta dinero, usamos tu algoritmo original del Día 1
         return metaService.calcularCuotaDiaria(metaMensual, utilidadActual, diasRestantes);
+    }
+
+    public BigDecimal obtenerIngresosHoy(Long usuarioId) {
+        java.time.LocalDateTime inicioDia = java.time.LocalDate.now().atStartOfDay();
+        java.time.LocalDateTime finDia = inicioDia.plusDays(1);
+
+        return transaccionRepository.sumarIngresosDeHoy(usuarioId, inicioDia, finDia);
     }
 }
