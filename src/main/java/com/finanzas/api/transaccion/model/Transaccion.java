@@ -20,11 +20,21 @@ public class Transaccion {
     @Column(nullable = false)
     private BigDecimal monto;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String tipo; // Guardaremos "INGRESO" o "EGRESO"
+    private TipoTransaccion tipo;
+
+    // Optional free-text note for the movement, e.g. "carrera al aeropuerto".
+    @Column(length = 500)
+    private String descripcion;
 
     @Column(nullable = false)
     private LocalDateTime fecha = LocalDateTime.now();
+
+    // Optional category; null means the movement is uncategorized.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "categoria_id")
+    private Categoria categoria;
 
     // Relación SQL: Muchas transacciones pertenecen a un Usuario
     @ManyToOne(fetch = FetchType.LAZY)

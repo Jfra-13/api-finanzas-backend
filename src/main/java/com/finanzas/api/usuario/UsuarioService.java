@@ -57,6 +57,7 @@ public class UsuarioService {
         nuevoUsuario.setEmail(dto.getEmail());
         nuevoUsuario.setNombre(dto.getNombre());
         nuevoUsuario.setPasswordHash(passwordEncoder.encode(dto.getPassword()));
+        nuevoUsuario.setTipoNegocio(dto.getTipoNegocio());
 
         usuarioRepository.save(nuevoUsuario);
     }

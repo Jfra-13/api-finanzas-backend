@@ -2,12 +2,21 @@ package com.finanzas.api.transaccion;
 
 import com.finanzas.api.meta.dto.DiaResumenDTO;
 import com.finanzas.api.meta.dto.ProgresoMetasDTO;
+import com.finanzas.api.meta.model.Meta;
 import com.finanzas.api.transaccion.dto.TransaccionRegistroDTO;
+import com.finanzas.api.transaccion.dto.TransaccionResponseDTO;
+import com.finanzas.api.transaccion.dto.TransaccionUpdateDTO;
+import com.finanzas.api.transaccion.model.TipoTransaccion;
 import com.finanzas.api.transaccion.model.Transaccion;
+import com.finanzas.api.shared.exception.specific.AccesoDenegadoException;
+import com.finanzas.api.shared.exception.specific.TransaccionNoEncontradaException;
 import com.finanzas.api.usuario.model.Usuario;
 import com.finanzas.api.usuario.UsuarioRepository;
 import com.finanzas.api.meta.MetaService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
@@ -16,13 +25,14 @@ import java.time.LocalDateTime;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class TransaccionService {
 
     private final TransaccionRepository transaccionRepository;
     private final UsuarioRepository usuarioRepository;
-    private final MetaService metaService; // Traemos tu algoritmo del Día 1
+    private final MetaService metaService;
 
     public TransaccionService(TransaccionRepository transaccionRepository, UsuarioRepository usuarioRepository, MetaService metaService) {
         this.transaccionRepository = transaccionRepository;
@@ -30,66 +40,79 @@ public class TransaccionService {
         this.metaService = metaService;
     }
 
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional
     public Transaccion registrar(Usuario usuario, TransaccionRegistroDTO dto) {
         Transaccion nuevaTransaccion = new Transaccion();
         nuevaTransaccion.setMonto(dto.getMonto());
-        nuevaTransaccion.setTipo(dto.getTipo().toUpperCase());
+        nuevaTransaccion.setTipo(TipoTransaccion.valueOf(dto.getTipo().toUpperCase()));
+        nuevaTransaccion.setDescripcion(dto.getDescripcion());
+        nuevaTransaccion.setFecha(dto.getFecha() != null ? dto.getFecha() : LocalDateTime.now());
         nuevaTransaccion.setUsuario(usuario);
 
         return transaccionRepository.save(nuevaTransaccion);
     }
 
-    public BigDecimal obtenerCuotaDiaria(Long usuarioId, BigDecimal metaMensual, int diasRestantes) {
-        BigDecimal utilidadActual = transaccionRepository.sumarIngresosPorUsuario(usuarioId)
-                .orElse(BigDecimal.ZERO);
+    // Net profit of the current month: incomes minus expenses, strictly this month.
+    public BigDecimal utilidadNetaDelMes(Long usuarioId) {
+        LocalDateTime inicioMes = LocalDate.now().withDayOfMonth(1).atStartOfDay();
+        LocalDateTime finMes = inicioMes.plusMonths(1);
 
-        // ¡EL PARCHE DE QA!
-        // Si ya ganaste más que la meta, enviamos la diferencia total en negativo
-        if (utilidadActual.compareTo(metaMensual) > 0) {
-            // Ejemplo: Meta 3000 - Utilidad 3500 = -500.
-            // Android recibirá -500, lo volverá positivo (abs) y dirá "Superada por S/ 500.00"
-            return metaMensual.subtract(utilidadActual);
+        BigDecimal ingresos = transaccionRepository.sumarPorTipoYRango(usuarioId, TipoTransaccion.INGRESO, inicioMes, finMes);
+        BigDecimal egresos = transaccionRepository.sumarPorTipoYRango(usuarioId, TipoTransaccion.EGRESO, inicioMes, finMes);
+        return ingresos.subtract(egresos);
+    }
+
+    // Daily profit quota driven by net profit. When meta/dias are null they are
+    // resolved from the active Meta in the DB (goal amount + remaining working days).
+    public BigDecimal obtenerCuotaDiaria(Long usuarioId, BigDecimal metaMensual, Integer diasRestantes) {
+        Optional<Meta> metaActiva = (metaMensual == null || diasRestantes == null)
+                ? metaService.obtenerMetaActual(usuarioId)
+                : Optional.empty();
+
+        BigDecimal meta = metaMensual != null
+                ? metaMensual
+                : metaActiva.map(Meta::getMontoObjetivo).orElse(BigDecimal.ZERO);
+
+        int dias = diasRestantes != null
+                ? diasRestantes
+                : metaService.diasLaborablesRestantes(metaActiva.map(Meta::getDiasLaborables).orElse(null));
+
+        BigDecimal utilidadNeta = utilidadNetaDelMes(usuarioId);
+
+        // Already above the goal: return the negative surplus so the client shows "Superada".
+        if (utilidadNeta.compareTo(meta) > 0) {
+            return meta.subtract(utilidadNeta);
         }
 
-        // Si todavía falta dinero, usamos tu algoritmo original del Día 1
-        return metaService.calcularCuotaDiaria(metaMensual, utilidadActual, diasRestantes);
+        return metaService.calcularCuotaDiaria(meta, utilidadNeta, dias);
     }
 
     public BigDecimal obtenerIngresosHoy(Long usuarioId) {
-        java.time.LocalDateTime inicioDia = java.time.LocalDate.now().atStartOfDay();
-        java.time.LocalDateTime finDia = inicioDia.plusDays(1);
-
-        return transaccionRepository.sumarIngresosDeHoy(usuarioId, inicioDia, finDia);
+        LocalDateTime inicioDia = LocalDate.now().atStartOfDay();
+        LocalDateTime finDia = inicioDia.plusDays(1);
+        return transaccionRepository.sumarPorTipoYRango(usuarioId, TipoTransaccion.INGRESO, inicioDia, finDia);
     }
 
     public List<DiaResumenDTO> obtenerResumenSemanal(Long usuarioId) {
-        // 1. Calculamos las fechas: Desde el Lunes a las 00:00 hasta el Domingo a las 23:59
         LocalDate hoy = LocalDate.now();
         LocalDateTime inicioSemana = hoy.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).atStartOfDay();
         LocalDateTime finSemana = hoy.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY)).plusDays(1).atStartOfDay();
 
-        // 2. Traemos todas las transacciones de esa semana
         List<Transaccion> transacciones = transaccionRepository.obtenerTransaccionesPorRango(usuarioId, inicioSemana, finSemana);
 
-        // 3. Preparamos nuestras 7 "cajas" de días vacías
         List<DiaResumenDTO> resumen = new ArrayList<>();
         String[] nombresDias = {"Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"};
-
         for (String nombreDia : nombresDias) {
             resumen.add(new DiaResumenDTO(nombreDia, BigDecimal.ZERO, BigDecimal.ZERO));
         }
 
-        // 4. Clasificamos cada transacción en la caja correcta
         for (Transaccion t : transacciones) {
-            // getDayOfWeek().getValue() devuelve 1 para Lunes, 7 para Domingo.
-            // Restamos 1 para que encaje en el índice de nuestra lista (0 a 6).
             int indexDia = t.getFecha().getDayOfWeek().getValue() - 1;
             DiaResumenDTO diaDto = resumen.get(indexDia);
 
-            if ("INGRESO".equalsIgnoreCase(t.getTipo())) {
+            if (t.getTipo() == TipoTransaccion.INGRESO) {
                 diaDto.setIngresos(diaDto.getIngresos().add(t.getMonto()));
-            } else if ("EGRESO".equalsIgnoreCase(t.getTipo())) {
+            } else if (t.getTipo() == TipoTransaccion.EGRESO) {
                 diaDto.setEgresos(diaDto.getEgresos().add(t.getMonto()));
             }
         }
@@ -97,39 +120,87 @@ public class TransaccionService {
         return resumen;
     }
 
-    public ProgresoMetasDTO obtenerProgresoMetas(Long usuarioId, BigDecimal metaMensual, int diasRestantes) {
+    // Indicators stay GROSS (income only); only metaDiaria uses the net engine.
+    public ProgresoMetasDTO obtenerProgresoMetas(Long usuarioId, BigDecimal metaMensual, Integer diasRestantes) {
         ProgresoMetasDTO progreso = new ProgresoMetasDTO();
 
-        // 1. CÁLCULO DIARIO
-        LocalDateTime inicioDia = LocalDate.now().atStartOfDay();
+        Optional<Meta> metaActiva = (metaMensual == null) ? metaService.obtenerMetaActual(usuarioId) : Optional.empty();
+        BigDecimal meta = metaMensual != null
+                ? metaMensual
+                : metaActiva.map(Meta::getMontoObjetivo).orElse(BigDecimal.ZERO);
+
+        LocalDate hoy = LocalDate.now();
+
+        // 1. DAILY (gross income)
+        LocalDateTime inicioDia = hoy.atStartOfDay();
         LocalDateTime finDia = inicioDia.plusDays(1);
-        // Reutilizamos tu consulta del MVP 2 (aunque se llame "DeHoy", funciona con cualquier rango)
-        BigDecimal ingresoDiario = transaccionRepository.sumarIngresosDeHoy(usuarioId, inicioDia, finDia);
+        BigDecimal ingresoDiario = transaccionRepository.sumarPorTipoYRango(usuarioId, TipoTransaccion.INGRESO, inicioDia, finDia);
         BigDecimal metaDiaria = obtenerCuotaDiaria(usuarioId, metaMensual, diasRestantes);
 
-        // 2. CÁLCULO SEMANAL
-        LocalDateTime inicioSemana = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).atStartOfDay();
+        // 2. WEEKLY (gross income)
+        LocalDateTime inicioSemana = hoy.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).atStartOfDay();
         LocalDateTime finSemana = inicioSemana.plusDays(7);
-        BigDecimal ingresoSemanal = transaccionRepository.sumarIngresosDeHoy(usuarioId, inicioSemana, finSemana);
-        // Si tu meta diaria es X, tu meta semanal esperada es X * 7
+        BigDecimal ingresoSemanal = transaccionRepository.sumarPorTipoYRango(usuarioId, TipoTransaccion.INGRESO, inicioSemana, finSemana);
         BigDecimal metaSemanal = metaDiaria.multiply(BigDecimal.valueOf(7));
 
-        // 3. CÁLCULO MENSUAL
-        LocalDateTime inicioMes = LocalDate.now().withDayOfMonth(1).atStartOfDay();
+        // 3. MONTHLY (gross income)
+        LocalDateTime inicioMes = hoy.withDayOfMonth(1).atStartOfDay();
         LocalDateTime finMes = inicioMes.plusMonths(1);
-        BigDecimal ingresoMensual = transaccionRepository.sumarIngresosDeHoy(usuarioId, inicioMes, finMes);
+        BigDecimal ingresoMensual = transaccionRepository.sumarPorTipoYRango(usuarioId, TipoTransaccion.INGRESO, inicioMes, finMes);
 
-        // 4. EMPAQUETAMOS TODO
         progreso.setIngresoDiario(ingresoDiario);
         progreso.setMetaDiaria(metaDiaria);
-
         progreso.setIngresoSemanal(ingresoSemanal);
         progreso.setMetaSemanal(metaSemanal);
-
         progreso.setIngresoMensual(ingresoMensual);
-        progreso.setMetaMensual(metaMensual);
+        progreso.setMetaMensual(meta);
 
         return progreso;
     }
 
+    // ---- CRUD (operational history) ----
+
+    public Page<TransaccionResponseDTO> listar(Long usuarioId, String tipo, Long categoriaId, Pageable pageable) {
+        TipoTransaccion tipoEnum = (tipo != null && !tipo.isBlank()) ? TipoTransaccion.valueOf(tipo.toUpperCase()) : null;
+        return transaccionRepository.buscar(usuarioId, tipoEnum, categoriaId, pageable).map(this::toResponse);
+    }
+
+    @Transactional
+    public TransaccionResponseDTO actualizar(Long usuarioId, Long id, TransaccionUpdateDTO dto) {
+        Transaccion transaccion = obtenerPropia(usuarioId, id);
+        transaccion.setMonto(dto.getMonto());
+        transaccion.setTipo(TipoTransaccion.valueOf(dto.getTipo().toUpperCase()));
+        transaccion.setDescripcion(dto.getDescripcion());
+        if (dto.getFecha() != null) {
+            transaccion.setFecha(dto.getFecha());
+        }
+        return toResponse(transaccionRepository.save(transaccion));
+    }
+
+    @Transactional
+    public void eliminar(Long usuarioId, Long id) {
+        Transaccion transaccion = obtenerPropia(usuarioId, id);
+        transaccionRepository.delete(transaccion);
+    }
+
+    // 404 if it does not exist, 403 if it belongs to another user.
+    private Transaccion obtenerPropia(Long usuarioId, Long id) {
+        Transaccion transaccion = transaccionRepository.findById(id)
+                .orElseThrow(TransaccionNoEncontradaException::new);
+        if (!transaccion.getUsuario().getId().equals(usuarioId)) {
+            throw new AccesoDenegadoException();
+        }
+        return transaccion;
+    }
+
+    private TransaccionResponseDTO toResponse(Transaccion t) {
+        TransaccionResponseDTO dto = new TransaccionResponseDTO();
+        dto.setId(t.getId());
+        dto.setMonto(t.getMonto());
+        dto.setTipo(t.getTipo().name());
+        dto.setDescripcion(t.getDescripcion());
+        dto.setFecha(t.getFecha());
+        dto.setUsuarioId(t.getUsuario().getId());
+        return dto;
+    }
 }

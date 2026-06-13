@@ -1,6 +1,5 @@
 package com.finanzas.api.support;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.finanzas.api.meta.MetaRepository;
 import com.finanzas.api.meta.model.Meta;
 import com.finanzas.api.security.JwtService;
@@ -13,7 +12,7 @@ import com.finanzas.api.transaccion.model.Transaccion;
 import com.finanzas.api.usuario.UsuarioRepository;
 import com.finanzas.api.usuario.model.Usuario;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,7 +33,6 @@ public abstract class IntegrationTestSupport {
     protected static final String AUTH = "Authorization";
 
     @Autowired protected MockMvc mockMvc;
-    @Autowired protected ObjectMapper objectMapper;
     @Autowired protected UsuarioRepository usuarioRepository;
     @Autowired protected TransaccionRepository transaccionRepository;
     @Autowired protected CategoriaRepository categoriaRepository;
