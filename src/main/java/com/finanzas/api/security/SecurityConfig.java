@@ -60,11 +60,17 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
+                // CORS is intentionally NOT enabled: the MVP client is a native
+                // Kotlin app, which is not subject to browser CORS. To support a
+                // web/smartwatch/fleet client later, enable it here with
+                // http.cors(cors -> cors.configurationSource(...)) and define the
+                // allowed origins via a CorsConfigurationSource bean.
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/api/v1/usuarios/registro",
                                 "/api/v1/usuarios/login",
+                                "/api/v1/usuarios/refresh",
                                 "/api/v1/usuarios/forgot-password",
                                 "/api/v1/usuarios/verify-otp",
                                 "/api/v1/usuarios/reset-password"

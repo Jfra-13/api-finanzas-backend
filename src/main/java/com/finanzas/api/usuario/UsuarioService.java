@@ -5,6 +5,7 @@ import com.finanzas.api.usuario.dto.ForgotPasswordDTO;
 import com.finanzas.api.usuario.dto.LoginDTO;
 import com.finanzas.api.usuario.dto.LoginResponseDTO;
 import com.finanzas.api.usuario.dto.NegocioUpdateDTO;
+import com.finanzas.api.usuario.dto.RefreshRequestDTO;
 import com.finanzas.api.usuario.dto.ResetPasswordDTO;
 import com.finanzas.api.usuario.dto.UsuarioRegistroDTO;
 import com.finanzas.api.usuario.dto.VerifyOtpDTO;
@@ -32,17 +33,20 @@ public class UsuarioService {
     private final EmailService emailService;
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
+    private final RefreshTokenService refreshTokenService;
 
     public UsuarioService(UsuarioRepository usuarioRepository,
                           PasswordEncoder passwordEncoder,
                           EmailService emailService,
                           AuthenticationManager authenticationManager,
-                          JwtService jwtService) {
+                          JwtService jwtService,
+                          RefreshTokenService refreshTokenService) {
         this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
         this.emailService = emailService;
         this.authenticationManager = authenticationManager;
         this.jwtService = jwtService;
+        this.refreshTokenService = refreshTokenService;
     }
 
     @Transactional
@@ -68,9 +72,24 @@ public class UsuarioService {
         UsuarioPrincipal userPrincipal = (UsuarioPrincipal) authentication.getPrincipal();
         Usuario usuario = userPrincipal.getUsuario();
         String jwtToken = jwtService.generateToken(userPrincipal);
+        String refreshToken = refreshTokenService.emitir(usuario);
 
+        return construirRespuesta(usuario, jwtToken, refreshToken);
+    }
+
+    // Exchanges a valid refresh token for a fresh access token and a rotated
+    // refresh token. The old refresh token is invalidated in the process.
+    public LoginResponseDTO refrescarToken(RefreshRequestDTO dto) {
+        RefreshTokenService.Rotacion rotacion = refreshTokenService.rotar(dto.getRefreshToken());
+        Usuario usuario = rotacion.usuario();
+        String jwtToken = jwtService.generateToken(new UsuarioPrincipal(usuario));
+        return construirRespuesta(usuario, jwtToken, rotacion.rawToken());
+    }
+
+    private LoginResponseDTO construirRespuesta(Usuario usuario, String accessToken, String refreshToken) {
         return LoginResponseDTO.builder()
-                .token(jwtToken)
+                .token(accessToken)
+                .refreshToken(refreshToken)
                 .usuarioId(usuario.getId())
                 .nombre(usuario.getNombre())
                 .email(usuario.getEmail())

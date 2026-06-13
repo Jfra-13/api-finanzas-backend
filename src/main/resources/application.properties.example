@@ -41,7 +41,10 @@ spring.mail.properties.mail.smtp.starttls.enable=true
 #   openssl rand -base64 32
 # ==========================================
 jwt.secret=${JWT_SECRET}
-jwt.expiration=86400000
+# Access token lifetime in ms (short-lived; client renews via refresh token).
+jwt.expiration=900000
+# Refresh token lifetime in ms (30 days), rotated and invalidated server-side.
+jwt.refresh-expiration=2592000000
 
 # ==========================================
 # REQUIRED ENVIRONMENT VARIABLES

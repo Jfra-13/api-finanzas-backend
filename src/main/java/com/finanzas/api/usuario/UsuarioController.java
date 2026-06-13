@@ -4,6 +4,7 @@ import com.finanzas.api.shared.dto.ApiResponseDTO;
 import com.finanzas.api.usuario.dto.LoginDTO;
 import com.finanzas.api.usuario.dto.LoginResponseDTO;
 import com.finanzas.api.usuario.dto.UsuarioRegistroDTO;
+import com.finanzas.api.usuario.dto.RefreshRequestDTO;
 import com.finanzas.api.usuario.dto.ForgotPasswordDTO;
 import com.finanzas.api.usuario.dto.VerifyOtpDTO;
 import com.finanzas.api.usuario.dto.ResetPasswordDTO;
@@ -34,6 +35,12 @@ public class UsuarioController {
     public ResponseEntity<ApiResponseDTO<LoginResponseDTO>> iniciarSesion(@Valid @RequestBody LoginDTO dto) {
         LoginResponseDTO responseDTO = usuarioService.login(dto);
         return ResponseEntity.ok(ApiResponseDTO.success(200, "LOGIN_SUCCESS", "Login exitoso", responseDTO, "/api/v1/usuarios/login"));
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<ApiResponseDTO<LoginResponseDTO>> refrescarToken(@Valid @RequestBody RefreshRequestDTO dto) {
+        LoginResponseDTO responseDTO = usuarioService.refrescarToken(dto);
+        return ResponseEntity.ok(ApiResponseDTO.success(200, "TOKEN_REFRESHED", "Token renovado", responseDTO, "/api/v1/usuarios/refresh"));
     }
 
     @PostMapping("/forgot-password")
