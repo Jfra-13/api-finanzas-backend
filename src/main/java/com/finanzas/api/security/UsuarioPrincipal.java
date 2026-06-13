@@ -1,6 +1,6 @@
 package com.finanzas.api.security;
 
-import com.finanzas.api.model.entity.Usuario;
+import com.finanzas.api.usuario.model.Usuario;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 

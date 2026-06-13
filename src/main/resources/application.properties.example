@@ -1,0 +1,49 @@
+# ==========================================
+# SERVER
+# ==========================================
+server.port=9090
+
+# ==========================================
+# DATABASE - LOCAL H2 (file)
+# ==========================================
+spring.datasource.url=jdbc:h2:file:./data/finanzas_db;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+spring.datasource.driverClassName=org.h2.Driver
+spring.datasource.username=${DB_USERNAME:adminjuan}
+spring.datasource.password=${DB_PASSWORD}
+spring.jpa.database-platform=org.hibernate.dialect.H2Dialect
+
+# ==========================================
+# HIBERNATE & H2 CONSOLE
+# ==========================================
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+spring.h2.console.enabled=true
+spring.h2.console.path=/h2-console
+spring.h2.console.settings.web-allow-others=false
+
+# ==========================================
+# MAIL
+# ==========================================
+spring.mail.host=smtp.gmail.com
+spring.mail.port=587
+spring.mail.username=your-email@gmail.com
+spring.mail.password=${MAIL_PASSWORD}
+spring.mail.properties.mail.smtp.auth=true
+spring.mail.properties.mail.smtp.starttls.enable=true
+
+# ==========================================
+# JWT
+# Generate a 256-bit base64 secret, e.g.:
+#   openssl rand -base64 32
+# ==========================================
+jwt.secret=${JWT_SECRET}
+jwt.expiration=86400000
+
+# ==========================================
+# REQUIRED ENVIRONMENT VARIABLES
+#   DB_PASSWORD    database password
+#   MAIL_PASSWORD  Gmail app password
+#   JWT_SECRET     256-bit base64 signing key
+# Optional:
+#   DB_USERNAME    database user (defaults to adminjuan)
+# ==========================================

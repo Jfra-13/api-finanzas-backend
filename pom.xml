@@ -11,8 +11,8 @@
 	<groupId>com.finanzas</groupId>
 	<artifactId>api</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name/>
-	<description/>
+	<name>api-finanzas-backend</name>
+	<description>Mobile-first financial tracker backend for independent workers (MVP: taxi drivers)</description>
 	<url/>
 	<licenses>
 		<license/>

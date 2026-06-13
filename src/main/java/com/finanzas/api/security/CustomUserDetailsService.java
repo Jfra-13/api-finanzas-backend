@@ -1,7 +1,7 @@
 package com.finanzas.api.security;
 
-import com.finanzas.api.model.entity.Usuario;
-import com.finanzas.api.repository.UsuarioRepository;
+import com.finanzas.api.usuario.model.Usuario;
+import com.finanzas.api.usuario.UsuarioRepository;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
