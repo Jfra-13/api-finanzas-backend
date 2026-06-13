@@ -69,6 +69,12 @@ public class SecurityConfig {
                                 "/api/v1/usuarios/verify-otp",
                                 "/api/v1/usuarios/reset-password"
                         ).permitAll()
+                        // OpenAPI contract + Swagger UI for the mobile team.
+                        .requestMatchers(
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html"
+                        ).permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session

@@ -11,8 +11,6 @@ import com.finanzas.api.usuario.dto.VerifyOtpDTO;
 import com.finanzas.api.usuario.model.Usuario;
 import com.finanzas.api.security.JwtService;
 import com.finanzas.api.security.UsuarioPrincipal;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -31,18 +29,18 @@ public class UsuarioService {
 
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
-    private final JavaMailSender mailSender;
+    private final EmailService emailService;
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
 
     public UsuarioService(UsuarioRepository usuarioRepository,
                           PasswordEncoder passwordEncoder,
-                          JavaMailSender mailSender,
+                          EmailService emailService,
                           AuthenticationManager authenticationManager,
                           JwtService jwtService) {
         this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
-        this.mailSender = mailSender;
+        this.emailService = emailService;
         this.authenticationManager = authenticationManager;
         this.jwtService = jwtService;
     }
@@ -88,7 +86,7 @@ public class UsuarioService {
             usuario.setExpiracionOtp(LocalDateTime.now().plusMinutes(10));
             usuario.setIntentosOtp(0);
             usuarioRepository.save(usuario);
-            enviarEmailOtp(usuario.getEmail(), otp);
+            emailService.enviarOtp(usuario.getEmail(), otp);
         });
     }
 
@@ -141,13 +139,5 @@ public class UsuarioService {
             usuarioRepository.save(usuario);
             throw new OtpInvalidoException();
         }
-    }
-
-    private void enviarEmailOtp(String email, String otp) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(email);
-        message.setSubject("Código de Recuperación");
-        message.setText("Tu código de verificación de 4 dígitos es: " + otp + "\n\nEste código expirará en 10 minutos.");
-        mailSender.send(message);
     }
 }
