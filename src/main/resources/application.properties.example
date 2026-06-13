@@ -15,7 +15,11 @@ spring.jpa.database-platform=org.hibernate.dialect.H2Dialect
 # ==========================================
 # HIBERNATE & H2 CONSOLE
 # ==========================================
-spring.jpa.hibernate.ddl-auto=update
+# Flyway owns the schema; Hibernate only validates the entity mapping against it.
+spring.jpa.hibernate.ddl-auto=validate
+# Map STRING enums to plain VARCHAR (not H2-native ENUM) so the same migration
+# is portable to PostgreSQL and validate agrees on both engines.
+spring.jpa.properties.hibernate.type.preferred_enum_jdbc_type=VARCHAR
 spring.jpa.show-sql=true
 spring.h2.console.enabled=true
 spring.h2.console.path=/h2-console
