@@ -6,9 +6,11 @@ import com.finanzas.api.meta.model.Meta;
 import com.finanzas.api.transaccion.dto.TransaccionRegistroDTO;
 import com.finanzas.api.transaccion.dto.TransaccionResponseDTO;
 import com.finanzas.api.transaccion.dto.TransaccionUpdateDTO;
+import com.finanzas.api.transaccion.model.Categoria;
 import com.finanzas.api.transaccion.model.TipoTransaccion;
 import com.finanzas.api.transaccion.model.Transaccion;
 import com.finanzas.api.shared.exception.specific.AccesoDenegadoException;
+import com.finanzas.api.shared.exception.specific.CategoriaNoEncontradaException;
 import com.finanzas.api.shared.exception.specific.TransaccionNoEncontradaException;
 import com.finanzas.api.usuario.model.Usuario;
 import com.finanzas.api.usuario.UsuarioRepository;
@@ -32,11 +34,13 @@ public class TransaccionService {
 
     private final TransaccionRepository transaccionRepository;
     private final UsuarioRepository usuarioRepository;
+    private final CategoriaRepository categoriaRepository;
     private final MetaService metaService;
 
-    public TransaccionService(TransaccionRepository transaccionRepository, UsuarioRepository usuarioRepository, MetaService metaService) {
+    public TransaccionService(TransaccionRepository transaccionRepository, UsuarioRepository usuarioRepository, CategoriaRepository categoriaRepository, MetaService metaService) {
         this.transaccionRepository = transaccionRepository;
         this.usuarioRepository = usuarioRepository;
+        this.categoriaRepository = categoriaRepository;
         this.metaService = metaService;
     }
 
@@ -47,6 +51,7 @@ public class TransaccionService {
         nuevaTransaccion.setTipo(TipoTransaccion.valueOf(dto.getTipo().toUpperCase()));
         nuevaTransaccion.setDescripcion(dto.getDescripcion());
         nuevaTransaccion.setFecha(dto.getFecha() != null ? dto.getFecha() : LocalDateTime.now());
+        nuevaTransaccion.setCategoria(resolverCategoria(usuario.getId(), dto.getCategoriaId()));
         nuevaTransaccion.setUsuario(usuario);
 
         return transaccionRepository.save(nuevaTransaccion);
@@ -174,6 +179,7 @@ public class TransaccionService {
         if (dto.getFecha() != null) {
             transaccion.setFecha(dto.getFecha());
         }
+        transaccion.setCategoria(resolverCategoria(usuarioId, dto.getCategoriaId()));
         return toResponse(transaccionRepository.save(transaccion));
     }
 
@@ -184,6 +190,16 @@ public class TransaccionService {
     }
 
     // 404 if it does not exist, 403 if it belongs to another user.
+    // Null id leaves the movement uncategorized; a non-null id must point to a
+    // base category or one owned by this user, otherwise 404.
+    private Categoria resolverCategoria(Long usuarioId, Long categoriaId) {
+        if (categoriaId == null) {
+            return null;
+        }
+        return categoriaRepository.findVisible(categoriaId, usuarioId)
+                .orElseThrow(CategoriaNoEncontradaException::new);
+    }
+
     private Transaccion obtenerPropia(Long usuarioId, Long id) {
         Transaccion transaccion = transaccionRepository.findById(id)
                 .orElseThrow(TransaccionNoEncontradaException::new);
@@ -200,6 +216,10 @@ public class TransaccionService {
         dto.setTipo(t.getTipo().name());
         dto.setDescripcion(t.getDescripcion());
         dto.setFecha(t.getFecha());
+        if (t.getCategoria() != null) {
+            dto.setCategoriaId(t.getCategoria().getId());
+            dto.setCategoriaNombre(t.getCategoria().getNombre());
+        }
         dto.setUsuarioId(t.getUsuario().getId());
         return dto;
     }

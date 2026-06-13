@@ -27,4 +27,8 @@ public class TransaccionUpdateDTO {
     private String descripcion;
 
     private LocalDateTime fecha;
+
+    // Optional category id; null clears the category. Must be a base category
+    // or one owned by the user.
+    private Long categoriaId;
 }
