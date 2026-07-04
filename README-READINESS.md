@@ -118,8 +118,19 @@ de BD) es una acción operativa del responsable, fuera del código.
 > El frontend debe ramificar **siempre por `code`**, nunca por `message` (el
 > mensaje es para humanos y puede cambiar).
 
-## Pendiente
+## Pendiente real
 
-- **Despliegue Azure (perfil `prod`)**: provisionar PostgreSQL, setear las
-  variables `DB_*`, arrancar con `SPRING_PROFILES_ACTIVE=prod` y verificar que
-  Flyway aplique las migraciones desde cero. Ver [README-PLAN.md](README-PLAN.md) Fase 4.
+- **#6 — Rotación efectiva de credenciales**: Gmail app password, `jwt.secret`
+  y password de BD siguen siendo los históricamente filtrados. Sacarlos del
+  repo (ya hecho) no es lo mismo que rotarlos. Acción operativa fuera de
+  código, marcada ⚠️ en el criterio 8 de la checklist.
+- **#9 — Despliegue Azure App Service**: criterio 9 de la checklist en ⏳.
+  Ya se verificó la **conexión** a PostgreSQL Azure corriendo el perfil `prod`
+  en local (Hikari conecta, Flyway valida) — eso NO es lo mismo que tener el
+  backend **desplegado** en Azure App Service. Falta confirmar si el deploy
+  ya se hizo o sigue pendiente.
+- **#12 — CORS**: sin tocar a propósito. Correcto según el plan: se activa
+  recién cuando entre un cliente basado en navegador (web/smartwatch/flota).
+  No es un pendiente real, es una decisión tomada.
+- **#18 — Metadatos `pom.xml`**: cosmético. `<license/>`, `<developers/>` y
+  `<scm/>` siguen vacíos en el POM.
