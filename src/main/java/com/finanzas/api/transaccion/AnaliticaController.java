@@ -3,6 +3,7 @@ package com.finanzas.api.transaccion;
 import com.finanzas.api.security.UsuarioPrincipal;
 import com.finanzas.api.shared.dto.ApiResponseDTO;
 import com.finanzas.api.transaccion.dto.AlertaDTO;
+import com.finanzas.api.transaccion.dto.ComparacionCategoriasDTO;
 import com.finanzas.api.transaccion.dto.TendenciaMensualDTO;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -35,6 +36,17 @@ public class AnaliticaController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta) {
         Map<String, BigDecimal> resumen = analiticaService.resumenCategorias(userPrincipal.getUsuario().getId(), desde, hasta);
         return ResponseEntity.ok(ApiResponseDTO.success(200, "CATEGORY_SUMMARY_OK", "Resumen de categorías obtenido", resumen, "/api/v1/finanzas/resumen-categorias"));
+    }
+
+    @GetMapping("/analiticas/comparacion-categorias")
+    public ResponseEntity<ApiResponseDTO<ComparacionCategoriasDTO>> comparacionCategorias(
+            @AuthenticationPrincipal UsuarioPrincipal userPrincipal,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
+            @RequestParam(required = false, defaultValue = "PERIODO_ANTERIOR") String compararCon) {
+        ComparacionCategoriasDTO comparacion = analiticaService.comparacionCategorias(
+                userPrincipal.getUsuario().getId(), desde, hasta, compararCon);
+        return ResponseEntity.ok(ApiResponseDTO.success(200, "CATEGORY_COMPARISON_OK", "Comparación de categorías obtenida", comparacion, "/api/v1/finanzas/analiticas/comparacion-categorias"));
     }
 
     @GetMapping("/tendencia-mensual")

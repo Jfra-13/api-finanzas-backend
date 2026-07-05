@@ -10,6 +10,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -17,6 +18,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AnaliticaIntegrationTest extends IntegrationTestSupport {
 
     private static final String CATEGORIAS = "/api/v1/finanzas/resumen-categorias";
+    private static final String COMPARACION = "/api/v1/finanzas/analiticas/comparacion-categorias";
     private static final String TENDENCIA = "/api/v1/finanzas/tendencia-mensual";
     private static final String SALUD = "/api/v1/finanzas/salud-financiera";
 
@@ -59,6 +61,70 @@ class AnaliticaIntegrationTest extends IntegrationTestSupport {
     void resumenCategorias_rangoInvertido_devuelve400() throws Exception {
         Usuario usuario = crearUsuario();
         mockMvc.perform(get(CATEGORIAS).header(AUTH, tokenDe(usuario))
+                        .param("desde", "2026-06-30").param("hasta", "2026-06-01"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("RANGO_FECHAS_INVALIDO"));
+    }
+
+    @Test
+    void comparacionCategorias_periodoAnterior_calculaDeltasYReferencia() throws Exception {
+        Usuario usuario = crearUsuario();
+        Categoria gasolina = crearCategoria("Gasolina", TipoTransaccion.EGRESO, null);
+        // Actual period 06-11..06-15 (5 days) → reference 06-06..06-10 (same length).
+        crearTransaccion(usuario, TipoTransaccion.EGRESO, "320.00", LocalDate.of(2026, 6, 13).atTime(10, 0), gasolina);
+        crearTransaccion(usuario, TipoTransaccion.EGRESO, "242.00", LocalDate.of(2026, 6, 8).atTime(10, 0), gasolina);
+
+        mockMvc.perform(get(COMPARACION).header(AUTH, tokenDe(usuario))
+                        .param("desde", "2026-06-11").param("hasta", "2026-06-15"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("CATEGORY_COMPARISON_OK"))
+                .andExpect(jsonPath("$.data.periodoActual.desde").value("2026-06-11"))
+                .andExpect(jsonPath("$.data.periodoAnterior.desde").value("2026-06-06"))
+                .andExpect(jsonPath("$.data.periodoAnterior.hasta").value("2026-06-10"))
+                .andExpect(jsonPath("$.data.categorias[?(@.categoria=='Gasolina')].deltaAbs").value(78.00))
+                // (320 - 242) / 242 * 100 = 32.2, rounded HALF_UP to 1 decimal.
+                .andExpect(jsonPath("$.data.categorias[?(@.categoria=='Gasolina')].deltaPct").value(32.2))
+                .andExpect(jsonPath("$.data.totalActual").value(320.00))
+                .andExpect(jsonPath("$.data.totalAnterior").value(242.00))
+                .andExpect(jsonPath("$.data.totalDeltaPct").value(32.2));
+    }
+
+    @Test
+    void comparacionCategorias_sinDatosDeReferencia_deltaPctNull() throws Exception {
+        Usuario usuario = crearUsuario();
+        Categoria gasolina = crearCategoria("Gasolina", TipoTransaccion.EGRESO, null);
+        crearTransaccion(usuario, TipoTransaccion.EGRESO, "40.00", LocalDate.of(2026, 6, 13).atTime(10, 0), gasolina);
+        // Reference window (06-06..06-10) is empty → division by zero avoided, delta null.
+
+        mockMvc.perform(get(COMPARACION).header(AUTH, tokenDe(usuario))
+                        .param("desde", "2026-06-11").param("hasta", "2026-06-15"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalAnterior").value(0))
+                .andExpect(jsonPath("$.data.totalDeltaPct").value(nullValue()))
+                .andExpect(jsonPath("$.data.categorias[?(@.categoria=='Gasolina')].anterior").value(0))
+                .andExpect(jsonPath("$.data.categorias[?(@.categoria=='Gasolina')].deltaAbs").value(40.00));
+    }
+
+    @Test
+    void comparacionCategorias_mismoPeriodoAnioAnterior() throws Exception {
+        Usuario usuario = crearUsuario();
+        Categoria gasolina = crearCategoria("Gasolina", TipoTransaccion.EGRESO, null);
+        crearTransaccion(usuario, TipoTransaccion.EGRESO, "100.00", LocalDate.of(2026, 6, 13).atTime(10, 0), gasolina);
+        crearTransaccion(usuario, TipoTransaccion.EGRESO, "50.00", LocalDate.of(2025, 6, 13).atTime(10, 0), gasolina);
+
+        mockMvc.perform(get(COMPARACION).header(AUTH, tokenDe(usuario))
+                        .param("desde", "2026-06-01").param("hasta", "2026-06-30")
+                        .param("compararCon", "MISMO_PERIODO_ANIO_ANTERIOR"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.periodoAnterior.desde").value("2025-06-01"))
+                .andExpect(jsonPath("$.data.periodoAnterior.hasta").value("2025-06-30"))
+                .andExpect(jsonPath("$.data.categorias[?(@.categoria=='Gasolina')].deltaPct").value(100.0));
+    }
+
+    @Test
+    void comparacionCategorias_rangoInvertido_devuelve400() throws Exception {
+        Usuario usuario = crearUsuario();
+        mockMvc.perform(get(COMPARACION).header(AUTH, tokenDe(usuario))
                         .param("desde", "2026-06-30").param("hasta", "2026-06-01"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("RANGO_FECHAS_INVALIDO"));
