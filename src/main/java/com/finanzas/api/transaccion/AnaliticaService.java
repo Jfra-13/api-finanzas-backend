@@ -2,9 +2,11 @@ package com.finanzas.api.transaccion;
 
 import com.finanzas.api.meta.MetaService;
 import com.finanzas.api.meta.model.Meta;
+import com.finanzas.api.shared.exception.specific.MetaNoEncontradaException;
 import com.finanzas.api.shared.exception.specific.RangoFechasInvalidoException;
 import com.finanzas.api.transaccion.dto.AlertaDTO;
 import com.finanzas.api.transaccion.dto.ComparacionCategoriasDTO;
+import com.finanzas.api.transaccion.dto.ProyeccionMensualDTO;
 import com.finanzas.api.transaccion.dto.TendenciaMensualDTO;
 import com.finanzas.api.transaccion.model.TipoTransaccion;
 import org.springframework.stereotype.Service;
@@ -138,6 +140,51 @@ public class AnaliticaService {
         return actual.subtract(anterior)
                 .multiply(BigDecimal.valueOf(100))
                 .divide(anterior, 1, RoundingMode.HALF_UP);
+    }
+
+    // A.3 End-of-month projection from the current run-rate. Uses the persisted
+    // active goal and the current month. Amounts are projected linearly by elapsed
+    // calendar days (deterministic and explainable): actual * diasDelMes / diasTranscurridos.
+    public ProyeccionMensualDTO proyeccionMensual(Long usuarioId) {
+        Meta meta = metaService.obtenerMetaActual(usuarioId)
+                .orElseThrow(MetaNoEncontradaException::new);
+
+        LocalDate hoy = LocalDate.now();
+        int diasTranscurridos = hoy.getDayOfMonth();
+        int diasDelMes = hoy.lengthOfMonth();
+        int diasHabilesRestantes = metaService.diasLaborablesRestantes(meta.getDiasLaborables());
+
+        LocalDateTime inicioMes = hoy.withDayOfMonth(1).atStartOfDay();
+        LocalDateTime finMes = inicioMes.plusMonths(1);
+        BigDecimal ingresoActual = transaccionRepository.sumarPorTipoYRango(usuarioId, TipoTransaccion.INGRESO, inicioMes, finMes);
+        BigDecimal egresoActual = transaccionRepository.sumarPorTipoYRango(usuarioId, TipoTransaccion.EGRESO, inicioMes, finMes);
+
+        BigDecimal ingresoProyectado = proyectar(ingresoActual, diasTranscurridos, diasDelMes);
+        BigDecimal egresoProyectado = proyectar(egresoActual, diasTranscurridos, diasDelMes);
+        BigDecimal utilidadProyectada = ingresoProyectado.subtract(egresoProyectado);
+        BigDecimal metaMensual = meta.getMontoObjetivo();
+
+        return new ProyeccionMensualDTO(
+                YearMonth.now().toString(),
+                diasTranscurridos,
+                diasDelMes,
+                diasHabilesRestantes,
+                ingresoActual,
+                egresoActual,
+                ingresoActual.subtract(egresoActual),
+                ingresoProyectado,
+                egresoProyectado,
+                utilidadProyectada,
+                metaMensual,
+                utilidadProyectada.subtract(metaMensual),
+                utilidadProyectada.compareTo(metaMensual) >= 0);
+    }
+
+    // Linear run-rate to full month, 2 decimals HALF_UP. diasTranscurridos is the
+    // day of month (>= 1), so it never divides by zero.
+    private BigDecimal proyectar(BigDecimal actual, int diasTranscurridos, int diasDelMes) {
+        return actual.multiply(BigDecimal.valueOf(diasDelMes))
+                .divide(BigDecimal.valueOf(diasTranscurridos), 2, RoundingMode.HALF_UP);
     }
 
     // B. Line chart: income/expense totals for the last N months, oldest first.

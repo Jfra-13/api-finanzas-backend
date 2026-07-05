@@ -6,6 +6,8 @@ import com.finanzas.api.transaccion.model.TipoTransaccion;
 import com.finanzas.api.usuario.model.Usuario;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -19,6 +21,7 @@ class AnaliticaIntegrationTest extends IntegrationTestSupport {
 
     private static final String CATEGORIAS = "/api/v1/finanzas/resumen-categorias";
     private static final String COMPARACION = "/api/v1/finanzas/analiticas/comparacion-categorias";
+    private static final String PROYECCION = "/api/v1/finanzas/proyeccion-mensual";
     private static final String TENDENCIA = "/api/v1/finanzas/tendencia-mensual";
     private static final String SALUD = "/api/v1/finanzas/salud-financiera";
 
@@ -128,6 +131,74 @@ class AnaliticaIntegrationTest extends IntegrationTestSupport {
                         .param("desde", "2026-06-30").param("hasta", "2026-06-01"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("RANGO_FECHAS_INVALIDO"));
+    }
+
+    @Test
+    void proyeccionMensual_calculaRunRateYBrecha() throws Exception {
+        Usuario usuario = crearUsuario();
+        crearMeta(usuario, "1000", periodoActual(), "1,2,3,4,5,6,7");
+        crearTransaccion(usuario, TipoTransaccion.INGRESO, "800.00", LocalDateTime.now(), null);
+        crearTransaccion(usuario, TipoTransaccion.EGRESO, "300.00", LocalDateTime.now(), null);
+
+        // Projection is date-dependent, so mirror the impl formula off the real clock.
+        int diasT = LocalDate.now().getDayOfMonth();
+        int diasM = LocalDate.now().lengthOfMonth();
+        BigDecimal ingresoProy = proyectar(new BigDecimal("800.00"), diasT, diasM);
+        BigDecimal egresoProy = proyectar(new BigDecimal("300.00"), diasT, diasM);
+        BigDecimal utilidadProy = ingresoProy.subtract(egresoProy);
+        boolean enCamino = utilidadProy.compareTo(new BigDecimal("1000")) >= 0;
+
+        mockMvc.perform(get(PROYECCION).header(AUTH, tokenDe(usuario)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("MONTHLY_PROJECTION_OK"))
+                .andExpect(jsonPath("$.data.periodo").value(periodoActual()))
+                .andExpect(jsonPath("$.data.diasTranscurridos").value(diasT))
+                .andExpect(jsonPath("$.data.diasDelMes").value(diasM))
+                .andExpect(jsonPath("$.data.ingresoActual").value(800.00))
+                .andExpect(jsonPath("$.data.egresoActual").value(300.00))
+                .andExpect(jsonPath("$.data.utilidadActual").value(500.00))
+                .andExpect(jsonPath("$.data.metaMensual").value(1000.00))
+                .andExpect(jsonPath("$.data.ingresoProyectado").value(ingresoProy.doubleValue()))
+                .andExpect(jsonPath("$.data.egresoProyectado").value(egresoProy.doubleValue()))
+                .andExpect(jsonPath("$.data.utilidadProyectada").value(utilidadProy.doubleValue()))
+                .andExpect(jsonPath("$.data.brechaProyectada").value(utilidadProy.subtract(new BigDecimal("1000")).doubleValue()))
+                .andExpect(jsonPath("$.data.enCamino").value(enCamino));
+    }
+
+    @Test
+    void proyeccionMensual_metaInalcanzable_enCaminoFalse() throws Exception {
+        Usuario usuario = crearUsuario();
+        crearMeta(usuario, "1000000", periodoActual(), "1,2,3,4,5,6,7");
+        crearTransaccion(usuario, TipoTransaccion.INGRESO, "500.00", LocalDateTime.now(), null);
+
+        mockMvc.perform(get(PROYECCION).header(AUTH, tokenDe(usuario)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.enCamino").value(false));
+    }
+
+    @Test
+    void proyeccionMensual_metaBaja_enCaminoTrue() throws Exception {
+        Usuario usuario = crearUsuario();
+        crearMeta(usuario, "1.00", periodoActual(), "1,2,3,4,5,6,7");
+        crearTransaccion(usuario, TipoTransaccion.INGRESO, "500.00", LocalDateTime.now(), null);
+
+        mockMvc.perform(get(PROYECCION).header(AUTH, tokenDe(usuario)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.enCamino").value(true));
+    }
+
+    @Test
+    void proyeccionMensual_sinMeta_devuelve404() throws Exception {
+        Usuario usuario = crearUsuario();
+        mockMvc.perform(get(PROYECCION).header(AUTH, tokenDe(usuario)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("META_NO_ENCONTRADA"));
+    }
+
+    // Mirror of AnaliticaService.proyectar: linear run-rate, 2 decimals HALF_UP.
+    private BigDecimal proyectar(BigDecimal actual, int diasTranscurridos, int diasDelMes) {
+        return actual.multiply(BigDecimal.valueOf(diasDelMes))
+                .divide(BigDecimal.valueOf(diasTranscurridos), 2, RoundingMode.HALF_UP);
     }
 
     @Test

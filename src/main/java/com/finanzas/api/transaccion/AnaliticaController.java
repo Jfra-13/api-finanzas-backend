@@ -4,6 +4,7 @@ import com.finanzas.api.security.UsuarioPrincipal;
 import com.finanzas.api.shared.dto.ApiResponseDTO;
 import com.finanzas.api.transaccion.dto.AlertaDTO;
 import com.finanzas.api.transaccion.dto.ComparacionCategoriasDTO;
+import com.finanzas.api.transaccion.dto.ProyeccionMensualDTO;
 import com.finanzas.api.transaccion.dto.TendenciaMensualDTO;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -55,6 +56,13 @@ public class AnaliticaController {
             @RequestParam(defaultValue = "6") int meses) {
         TendenciaMensualDTO tendencia = analiticaService.tendenciaMensual(userPrincipal.getUsuario().getId(), meses);
         return ResponseEntity.ok(ApiResponseDTO.success(200, "MONTHLY_TREND_OK", "Tendencia mensual obtenida", tendencia, "/api/v1/finanzas/tendencia-mensual"));
+    }
+
+    @GetMapping("/proyeccion-mensual")
+    public ResponseEntity<ApiResponseDTO<ProyeccionMensualDTO>> proyeccionMensual(
+            @AuthenticationPrincipal UsuarioPrincipal userPrincipal) {
+        ProyeccionMensualDTO proyeccion = analiticaService.proyeccionMensual(userPrincipal.getUsuario().getId());
+        return ResponseEntity.ok(ApiResponseDTO.success(200, "MONTHLY_PROJECTION_OK", "Proyección mensual obtenida", proyeccion, "/api/v1/finanzas/proyeccion-mensual"));
     }
 
     @GetMapping("/salud-financiera")

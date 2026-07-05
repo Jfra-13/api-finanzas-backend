@@ -15,7 +15,7 @@ Cierra la Fase 5.5 del [README-PLAN.md](README-PLAN.md).
 | 2 | Envelope de éxito y de error consistente en todos los endpoints | ✅ |
 | 3 | Códigos `code` estables y documentados (el frontend decide por `code`, no por `message`) | ✅ (este doc) |
 | 4 | 401 real en sesión vencida / token inválido (no 500) | ✅ (probado) |
-| 5 | Historial, meta persistida y categorías expuestos y probados | ✅ (65 tests) |
+| 5 | Historial, meta persistida y categorías expuestos y probados | ✅ (69 tests) |
 | 6 | Manejo de sesión con refresh token definido y probado | ✅ |
 | 7 | Secretos fuera del repo | ✅ (`application*.properties` gitignored) |
 | 8 | Credenciales rotadas | ⚠️ acción del responsable (ver nota) |
@@ -90,6 +90,7 @@ de BD) es una acción operativa del responsable, fuera del código.
 | GET | `/tendencia-mensual` | `MONTHLY_TREND_OK` |
 | GET | `/salud-financiera` | `FINANCIAL_HEALTH_OK` |
 | GET | `/analiticas/comparacion-categorias` | `CATEGORY_COMPARISON_OK` |
+| GET | `/proyeccion-mensual` | `MONTHLY_PROJECTION_OK` |
 | POST | `/presupuestos` | `BUDGET_SET` |
 | GET | `/presupuestos` | `BUDGETS_OK` |
 | DELETE | `/presupuestos/{id}` | `BUDGET_DELETED` |
