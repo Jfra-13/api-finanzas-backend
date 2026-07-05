@@ -28,6 +28,19 @@ public interface TransaccionRepository extends JpaRepository<Transaccion, Long> 
             @Param("fin") LocalDateTime fin
     );
 
+    // Expense total for one specific category within a range; used to read a
+    // budget's current-month spend. COALESCE keeps it at 0 when there are none.
+    @Query("SELECT COALESCE(SUM(t.monto), 0) FROM Transaccion t " +
+            "WHERE t.usuario.id = :usuarioId AND t.categoria.id = :categoriaId " +
+            "AND t.tipo = com.finanzas.api.transaccion.model.TipoTransaccion.EGRESO " +
+            "AND t.fecha >= :inicio AND t.fecha < :fin")
+    BigDecimal sumarEgresoPorCategoriaYRango(
+            @Param("usuarioId") Long usuarioId,
+            @Param("categoriaId") Long categoriaId,
+            @Param("inicio") LocalDateTime inicio,
+            @Param("fin") LocalDateTime fin
+    );
+
     // Expense totals grouped by category name within a range. Uncategorized rows
     // come back with a null name; the caller buckets them as "Sin categoría".
     @Query("SELECT c.nombre, SUM(t.monto) FROM Transaccion t LEFT JOIN t.categoria c " +
