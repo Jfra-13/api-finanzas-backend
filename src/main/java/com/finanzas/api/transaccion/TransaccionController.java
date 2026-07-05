@@ -13,11 +13,13 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/api/v1/finanzas")
@@ -39,15 +41,17 @@ public class TransaccionController {
         return ResponseEntity.ok(ApiResponseDTO.success(200, "TRANSACTION_CREATED", "¡Transacción guardada exitosamente!", null, TX_PATH));
     }
 
-    // Paged history; newest first by default. Optional type/category filters.
+    // Paged history; newest first by default. Optional type/category/date-range filters.
     @GetMapping("/transacciones")
     public ResponseEntity<ApiResponseDTO<Page<TransaccionResponseDTO>>> listarTransacciones(
             @AuthenticationPrincipal UsuarioPrincipal userPrincipal,
             @RequestParam(required = false) String tipo,
             @RequestParam(required = false) Long categoriaId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
             @PageableDefault(sort = "fecha", direction = Sort.Direction.DESC) Pageable pageable) {
         Page<TransaccionResponseDTO> historial = transaccionService.listar(
-                userPrincipal.getUsuario().getId(), tipo, categoriaId, pageable);
+                userPrincipal.getUsuario().getId(), tipo, categoriaId, desde, hasta, pageable);
         return ResponseEntity.ok(ApiResponseDTO.success(200, "TRANSACTIONS_OK", "Historial obtenido", historial, TX_PATH));
     }
 

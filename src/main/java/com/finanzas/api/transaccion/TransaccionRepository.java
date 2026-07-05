@@ -55,14 +55,20 @@ public interface TransaccionRepository extends JpaRepository<Transaccion, Long> 
             @Param("fin") LocalDateTime fin
     );
 
-    // Paged history with optional type/category filters; sort comes from Pageable.
+    // Paged history with optional type/category/date-range filters; sort comes from
+    // Pageable. Range bounds are half-open: [desde, hasta), so the caller passes the
+    // exclusive upper bound (start of the day after the inclusive 'hasta').
     @Query("SELECT t FROM Transaccion t WHERE t.usuario.id = :usuarioId " +
             "AND (:tipo IS NULL OR t.tipo = :tipo) " +
-            "AND (:categoriaId IS NULL OR t.categoria.id = :categoriaId)")
+            "AND (:categoriaId IS NULL OR t.categoria.id = :categoriaId) " +
+            "AND (:desde IS NULL OR t.fecha >= :desde) " +
+            "AND (:hasta IS NULL OR t.fecha < :hasta)")
     Page<Transaccion> buscar(
             @Param("usuarioId") Long usuarioId,
             @Param("tipo") TipoTransaccion tipo,
             @Param("categoriaId") Long categoriaId,
+            @Param("desde") LocalDateTime desde,
+            @Param("hasta") LocalDateTime hasta,
             Pageable pageable
     );
 }

@@ -4,6 +4,7 @@ import com.finanzas.api.security.UsuarioPrincipal;
 import com.finanzas.api.shared.dto.ApiResponseDTO;
 import com.finanzas.api.transaccion.dto.AlertaDTO;
 import com.finanzas.api.transaccion.dto.TendenciaMensualDTO;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -28,8 +30,10 @@ public class AnaliticaController {
 
     @GetMapping("/resumen-categorias")
     public ResponseEntity<ApiResponseDTO<Map<String, BigDecimal>>> resumenCategorias(
-            @AuthenticationPrincipal UsuarioPrincipal userPrincipal) {
-        Map<String, BigDecimal> resumen = analiticaService.resumenCategorias(userPrincipal.getUsuario().getId());
+            @AuthenticationPrincipal UsuarioPrincipal userPrincipal,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta) {
+        Map<String, BigDecimal> resumen = analiticaService.resumenCategorias(userPrincipal.getUsuario().getId(), desde, hasta);
         return ResponseEntity.ok(ApiResponseDTO.success(200, "CATEGORY_SUMMARY_OK", "Resumen de categorías obtenido", resumen, "/api/v1/finanzas/resumen-categorias"));
     }
 

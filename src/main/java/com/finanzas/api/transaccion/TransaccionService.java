@@ -11,6 +11,7 @@ import com.finanzas.api.transaccion.model.TipoTransaccion;
 import com.finanzas.api.transaccion.model.Transaccion;
 import com.finanzas.api.shared.exception.specific.AccesoDenegadoException;
 import com.finanzas.api.shared.exception.specific.CategoriaNoEncontradaException;
+import com.finanzas.api.shared.exception.specific.RangoFechasInvalidoException;
 import com.finanzas.api.shared.exception.specific.TransaccionNoEncontradaException;
 import com.finanzas.api.usuario.model.Usuario;
 import com.finanzas.api.usuario.UsuarioRepository;
@@ -165,9 +166,19 @@ public class TransaccionService {
 
     // ---- CRUD (operational history) ----
 
-    public Page<TransaccionResponseDTO> listar(Long usuarioId, String tipo, Long categoriaId, Pageable pageable) {
+    public Page<TransaccionResponseDTO> listar(Long usuarioId, String tipo, Long categoriaId, LocalDate desde, LocalDate hasta, Pageable pageable) {
+        validarRango(desde, hasta);
         TipoTransaccion tipoEnum = (tipo != null && !tipo.isBlank()) ? TipoTransaccion.valueOf(tipo.toUpperCase()) : null;
-        return transaccionRepository.buscar(usuarioId, tipoEnum, categoriaId, pageable).map(this::toResponse);
+        LocalDateTime desdeDt = desde != null ? desde.atStartOfDay() : null;
+        LocalDateTime hastaDt = hasta != null ? hasta.plusDays(1).atStartOfDay() : null; // inclusive end-of-day → exclusive next-day start
+        return transaccionRepository.buscar(usuarioId, tipoEnum, categoriaId, desdeDt, hastaDt, pageable).map(this::toResponse);
+    }
+
+    // 'desde'/'hasta' are inclusive calendar days; 'desde' after 'hasta' is a 400.
+    private void validarRango(LocalDate desde, LocalDate hasta) {
+        if (desde != null && hasta != null && desde.isAfter(hasta)) {
+            throw new RangoFechasInvalidoException();
+        }
     }
 
     @Transactional

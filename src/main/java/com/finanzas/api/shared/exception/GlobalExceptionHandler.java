@@ -12,6 +12,7 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -65,6 +66,27 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.BAD_REQUEST.value())
                 .code("MALFORMED_JSON")
                 .message("Formato de solicitud JSON inválido")
+                .path(request.getRequestURI())
+                .build();
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    // A bad query-param type (e.g. a malformed 'desde'/'hasta' date) is a client
+    // error, not a 500. Date-range params map to the range code; anything else to a
+    // generic param-type code so the client still branches deterministically.
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponseDTO> handleTypeMismatch(MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
+        log.warn("Type mismatch at {} for param '{}': {}", request.getRequestURI(), ex.getName(), ex.getMessage());
+        boolean esRango = "desde".equals(ex.getName()) || "hasta".equals(ex.getName());
+        String code = esRango ? "RANGO_FECHAS_INVALIDO" : "PARAMETRO_INVALIDO";
+        String message = esRango
+                ? "El formato de fecha es inválido; use YYYY-MM-DD"
+                : "El parámetro '" + ex.getName() + "' tiene un formato inválido";
+        ErrorResponseDTO response = ErrorResponseDTO.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .code(code)
+                .message(message)
                 .path(request.getRequestURI())
                 .build();
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);

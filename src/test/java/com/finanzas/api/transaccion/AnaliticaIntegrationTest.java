@@ -6,6 +6,7 @@ import com.finanzas.api.transaccion.model.TipoTransaccion;
 import com.finanzas.api.usuario.model.Usuario;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import static org.hamcrest.Matchers.hasSize;
@@ -38,6 +39,29 @@ class AnaliticaIntegrationTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.data['Gasolina']").value(150.00))
                 .andExpect(jsonPath("$.data['Alimentación']").value(80.00))
                 .andExpect(jsonPath("$.data['Sin categoría']").value(30.00));
+    }
+
+    @Test
+    void resumenCategorias_conRangoAcotaAlPeriodoPedido() throws Exception {
+        Usuario usuario = crearUsuario();
+        Categoria gasolina = crearCategoria("Gasolina", TipoTransaccion.EGRESO, null);
+        // One expense inside the requested range, one outside; only the first counts.
+        crearTransaccion(usuario, TipoTransaccion.EGRESO, "100.00", LocalDate.of(2026, 6, 15).atTime(10, 0), gasolina);
+        crearTransaccion(usuario, TipoTransaccion.EGRESO, "999.00", LocalDate.of(2026, 5, 15).atTime(10, 0), gasolina);
+
+        mockMvc.perform(get(CATEGORIAS).header(AUTH, tokenDe(usuario))
+                        .param("desde", "2026-06-01").param("hasta", "2026-06-30"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data['Gasolina']").value(100.00));
+    }
+
+    @Test
+    void resumenCategorias_rangoInvertido_devuelve400() throws Exception {
+        Usuario usuario = crearUsuario();
+        mockMvc.perform(get(CATEGORIAS).header(AUTH, tokenDe(usuario))
+                        .param("desde", "2026-06-30").param("hasta", "2026-06-01"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("RANGO_FECHAS_INVALIDO"));
     }
 
     @Test

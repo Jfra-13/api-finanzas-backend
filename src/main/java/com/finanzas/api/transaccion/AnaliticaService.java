@@ -2,6 +2,7 @@ package com.finanzas.api.transaccion;
 
 import com.finanzas.api.meta.MetaService;
 import com.finanzas.api.meta.model.Meta;
+import com.finanzas.api.shared.exception.specific.RangoFechasInvalidoException;
 import com.finanzas.api.transaccion.dto.AlertaDTO;
 import com.finanzas.api.transaccion.dto.TendenciaMensualDTO;
 import com.finanzas.api.transaccion.model.TipoTransaccion;
@@ -36,12 +37,21 @@ public class AnaliticaService {
         this.metaService = metaService;
     }
 
-    // A. Pie chart: this month's expenses grouped by category; uncategorized as "Sin categoría".
-    public Map<String, BigDecimal> resumenCategorias(Long usuarioId) {
-        LocalDateTime inicioMes = LocalDate.now().withDayOfMonth(1).atStartOfDay();
-        LocalDateTime finMes = inicioMes.plusMonths(1);
+    // A. Pie chart: expenses grouped by category; uncategorized as "Sin categoría".
+    // Without a range it defaults to the current month (backward compatible). Range
+    // bounds are inclusive calendar days, resolved to a half-open [inicio, fin) interval.
+    public Map<String, BigDecimal> resumenCategorias(Long usuarioId, LocalDate desde, LocalDate hasta) {
+        if (desde != null && hasta != null && desde.isAfter(hasta)) {
+            throw new RangoFechasInvalidoException();
+        }
+        LocalDateTime inicio = desde != null
+                ? desde.atStartOfDay()
+                : LocalDate.now().withDayOfMonth(1).atStartOfDay();
+        LocalDateTime fin = hasta != null
+                ? hasta.plusDays(1).atStartOfDay()
+                : LocalDate.now().withDayOfMonth(1).plusMonths(1).atStartOfDay();
 
-        List<Object[]> filas = transaccionRepository.sumarEgresosPorCategoria(usuarioId, inicioMes, finMes);
+        List<Object[]> filas = transaccionRepository.sumarEgresosPorCategoria(usuarioId, inicio, fin);
 
         Map<String, BigDecimal> resumen = new LinkedHashMap<>();
         for (Object[] fila : filas) {

@@ -7,6 +7,7 @@ import com.finanzas.api.transaccion.model.Transaccion;
 import com.finanzas.api.usuario.model.Usuario;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import static org.hamcrest.Matchers.hasSize;
@@ -132,6 +133,39 @@ class TransaccionCrudIntegrationTest extends IntegrationTestSupport {
         mockMvc.perform(delete(TX + "/999999").header(AUTH, tokenDe(usuario)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("TRANSACCION_NO_ENCONTRADA"));
+    }
+
+    @Test
+    void listar_filtraPorRangoFechas_hastaInclusivoElDiaCompleto() throws Exception {
+        Usuario usuario = crearUsuario();
+        // Outside range (before 'desde') and after 'hasta', plus one at 23:30 of the
+        // 'hasta' day to prove the upper bound covers the whole calendar day.
+        crearTransaccion(usuario, TipoTransaccion.INGRESO, "10.00", LocalDate.of(2026, 6, 10).atTime(8, 0), null);
+        crearTransaccion(usuario, TipoTransaccion.INGRESO, "20.00", LocalDate.of(2026, 6, 15).atTime(23, 30), null);
+        crearTransaccion(usuario, TipoTransaccion.INGRESO, "30.00", LocalDate.of(2026, 6, 20).atTime(10, 0), null);
+
+        mockMvc.perform(get(TX).header(AUTH, tokenDe(usuario))
+                        .param("desde", "2026-06-11").param("hasta", "2026-06-15"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content", hasSize(1)))
+                .andExpect(jsonPath("$.data.content[0].monto").value(20.00));
+    }
+
+    @Test
+    void listar_rangoInvertido_devuelve400() throws Exception {
+        Usuario usuario = crearUsuario();
+        mockMvc.perform(get(TX).header(AUTH, tokenDe(usuario))
+                        .param("desde", "2026-06-20").param("hasta", "2026-06-10"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("RANGO_FECHAS_INVALIDO"));
+    }
+
+    @Test
+    void listar_fechaMalformada_devuelve400() throws Exception {
+        Usuario usuario = crearUsuario();
+        mockMvc.perform(get(TX).header(AUTH, tokenDe(usuario)).param("desde", "ayer"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("RANGO_FECHAS_INVALIDO"));
     }
 
     @Test
