@@ -15,7 +15,7 @@ Cierra la Fase 5.5 del [README-PLAN.md](README-PLAN.md).
 | 2 | Envelope de éxito y de error consistente en todos los endpoints | ✅ |
 | 3 | Códigos `code` estables y documentados (el frontend decide por `code`, no por `message`) | ✅ (este doc) |
 | 4 | 401 real en sesión vencida / token inválido (no 500) | ✅ (probado) |
-| 5 | Historial, meta persistida y categorías expuestos y probados | ✅ (48 tests) |
+| 5 | Historial, meta persistida y categorías expuestos y probados | ✅ (65 tests) |
 | 6 | Manejo de sesión con refresh token definido y probado | ✅ |
 | 7 | Secretos fuera del repo | ✅ (`application*.properties` gitignored) |
 | 8 | Credenciales rotadas | ⚠️ acción del responsable (ver nota) |
@@ -89,10 +89,21 @@ de BD) es una acción operativa del responsable, fuera del código.
 | GET | `/resumen-categorias` | `CATEGORY_SUMMARY_OK` |
 | GET | `/tendencia-mensual` | `MONTHLY_TREND_OK` |
 | GET | `/salud-financiera` | `FINANCIAL_HEALTH_OK` |
+| GET | `/analiticas/comparacion-categorias` | `CATEGORY_COMPARISON_OK` |
+| POST | `/presupuestos` | `BUDGET_SET` |
+| GET | `/presupuestos` | `BUDGETS_OK` |
+| DELETE | `/presupuestos/{id}` | `BUDGET_DELETED` |
 | POST | `/metas` | `GOAL_SET` |
 | GET | `/metas/actual` | `GOAL_OK` |
 | POST | `/categorias` | `CATEGORY_CREATED` |
 | GET | `/categorias` | `CATEGORIES_OK` |
+
+**Filtro por rango de fechas (opcional).** `GET /transacciones` y
+`GET /resumen-categorias` aceptan `desde` y `hasta` (`YYYY-MM-DD`, ambos
+inclusivos). Sin ellos, el comportamiento no cambia (`resumen-categorias`
+sigue devolviendo el mes en curso). `comparacion-categorias` usa los mismos
+`desde`/`hasta` más `compararCon` (`PERIODO_ANTERIOR` por defecto o
+`MISMO_PERIODO_ANIO_ANTERIOR`).
 
 ## Catálogo de códigos `code` de error
 
@@ -100,6 +111,8 @@ de BD) es una acción operativa del responsable, fuera del código.
 |---|---|---|
 | `VALIDATION_ERROR` | 400 | Falla de validación de campos (incluye `details`) |
 | `MALFORMED_JSON` | 400 | JSON de la request mal formado |
+| `RANGO_FECHAS_INVALIDO` | 400 | `desde > hasta`, o fecha (`desde`/`hasta`) mal formada |
+| `PARAMETRO_INVALIDO` | 400 | Query param con tipo/formato inválido (que no sea fecha) |
 | `UNAUTHORIZED` | 401 | Sin token, token inválido/expirado, o credenciales de login inválidas |
 | `REFRESH_TOKEN_INVALIDO` | 401 | Refresh token inexistente, expirado o ya usado (rotado) |
 | `CREDENCIALES_INVALIDAS` | 401 | Credenciales inválidas (variante explícita) |
@@ -109,6 +122,7 @@ de BD) es una acción operativa del responsable, fuera del código.
 | `TRANSACCION_NO_ENCONTRADA` | 404 | Transacción inexistente |
 | `META_NO_ENCONTRADA` | 404 | No hay meta activa para el período actual |
 | `CATEGORIA_NO_ENCONTRADA` | 404 | Categoría inexistente |
+| `PRESUPUESTO_NO_ENCONTRADO` | 404 | Presupuesto inexistente |
 | `EMAIL_DUPLICADO` | 422 | Email ya registrado |
 | `OTP_INVALIDO` | 422 | Código OTP inválido (o email inexistente, sin distinción) |
 | `OTP_EXPIRADO` | 422 | Código OTP expirado |
