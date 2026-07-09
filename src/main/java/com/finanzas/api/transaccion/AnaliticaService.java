@@ -6,6 +6,7 @@ import com.finanzas.api.shared.exception.specific.MetaNoEncontradaException;
 import com.finanzas.api.shared.exception.specific.RangoFechasInvalidoException;
 import com.finanzas.api.transaccion.dto.AlertaDTO;
 import com.finanzas.api.transaccion.dto.ComparacionCategoriasDTO;
+import com.finanzas.api.transaccion.dto.PresupuestoResponseDTO;
 import com.finanzas.api.transaccion.dto.ProyeccionMensualDTO;
 import com.finanzas.api.transaccion.dto.TendenciaMensualDTO;
 import com.finanzas.api.transaccion.model.TipoTransaccion;
@@ -31,17 +32,23 @@ import java.util.Set;
 public class AnaliticaService {
 
     private static final BigDecimal UMBRAL_FELICITACION = new BigDecimal("0.80");
+    // Savings rate = net profit / income. Below 10% is a warning; above 20% is healthy.
+    private static final BigDecimal TASA_AHORRO_BAJA_MAX = new BigDecimal("0.10");
+    private static final BigDecimal TASA_AHORRO_SANA_MIN = new BigDecimal("0.20");
 
     private final TransaccionRepository transaccionRepository;
     private final TransaccionService transaccionService;
     private final MetaService metaService;
+    private final PresupuestoService presupuestoService;
 
     public AnaliticaService(TransaccionRepository transaccionRepository,
                             TransaccionService transaccionService,
-                            MetaService metaService) {
+                            MetaService metaService,
+                            PresupuestoService presupuestoService) {
         this.transaccionRepository = transaccionRepository;
         this.transaccionService = transaccionService;
         this.metaService = metaService;
+        this.presupuestoService = presupuestoService;
     }
 
     // A. Pie chart: expenses grouped by category; uncategorized as "Sin categoría".
@@ -221,14 +228,14 @@ public class AnaliticaService {
 
         // Rule 1: today's expenses exceed the daily profit quota.
         if (cuotaDiaria.signum() > 0 && egresosHoy(usuarioId).compareTo(cuotaDiaria) > 0) {
-            alertas.add(new AlertaDTO("ALERTA", "GASTO_DIARIO_ALTO",
+            alertas.add(new AlertaDTO("ALERTA", "GASTO_DIARIO_ALTO", "MEDIA",
                     "Tus gastos de hoy superan tu meta de ganancia diaria."));
         }
 
         // Rule 2: net profit reached 80% of the monthly goal.
         if (metaMensual.signum() > 0
                 && utilidadNeta.compareTo(metaMensual.multiply(UMBRAL_FELICITACION)) >= 0) {
-            alertas.add(new AlertaDTO("FELICITACION", "META_CERCA",
+            alertas.add(new AlertaDTO("FELICITACION", "META_CERCA", "BAJA",
                     "¡Vas excelente! Alcanzaste el 80% de tu meta del mes."));
         }
 
@@ -237,8 +244,51 @@ public class AnaliticaService {
         if (metaMensual.signum() > 0 && diasRestantes > 0 && cuotaDiaria.signum() > 0) {
             BigDecimal mejorDia = mejorDiaHistorico(usuarioId);
             if (mejorDia != null && cuotaDiaria.compareTo(mejorDia) > 0) {
-                alertas.add(new AlertaDTO("ALERTA", "META_EN_RIESGO",
+                alertas.add(new AlertaDTO("ALERTA", "META_EN_RIESGO", "ALTA",
                         "La ganancia diaria que necesitas supera tu mejor día histórico. Meta en riesgo."));
+            }
+        }
+
+        // Month totals for the expanded rules below.
+        LocalDateTime inicioMes = LocalDate.now().withDayOfMonth(1).atStartOfDay();
+        LocalDateTime finMes = inicioMes.plusMonths(1);
+        BigDecimal ingresoMes = transaccionRepository.sumarPorTipoYRango(usuarioId, TipoTransaccion.INGRESO, inicioMes, finMes);
+        BigDecimal egresoMes = transaccionRepository.sumarPorTipoYRango(usuarioId, TipoTransaccion.EGRESO, inicioMes, finMes);
+
+        // Rule 4: monthly expenses exceed monthly income.
+        if (egresoMes.compareTo(ingresoMes) > 0) {
+            alertas.add(new AlertaDTO("ALERTA", "EGRESOS_SUPERAN_INGRESOS", "ALTA",
+                    "Tus egresos del mes superan tus ingresos."));
+        }
+
+        // Rules 5/6: savings rate = net profit / income (only when there is income).
+        if (ingresoMes.signum() > 0) {
+            BigDecimal tasaAhorro = utilidadNeta.divide(ingresoMes, 4, RoundingMode.HALF_UP);
+            if (tasaAhorro.compareTo(TASA_AHORRO_BAJA_MAX) < 0) {
+                alertas.add(new AlertaDTO("ALERTA", "TASA_AHORRO_BAJA", "MEDIA",
+                        "Tu tasa de ahorro del mes está por debajo del 10%."));
+            } else if (tasaAhorro.compareTo(TASA_AHORRO_SANA_MIN) > 0) {
+                alertas.add(new AlertaDTO("FELICITACION", "TASA_AHORRO_SANA", "BAJA",
+                        "¡Tu tasa de ahorro supera el 20%! Buen manejo del dinero."));
+            }
+        }
+
+        // Rule 7: one signal per budget exceeded this month.
+        for (PresupuestoResponseDTO p : presupuestoService.listar(usuarioId)) {
+            if (p.isExcedido()) {
+                BigDecimal exceso = p.getConsumoPct().subtract(BigDecimal.valueOf(100));
+                alertas.add(new AlertaDTO("ALERTA", "PRESUPUESTO_EXCEDIDO", "ALTA",
+                        "Superaste el presupuesto de " + p.getCategoriaNombre() + " en " + exceso + "%.",
+                        p.getCategoriaId()));
+            }
+        }
+
+        // Rule 8: end-of-month projection falls short of the goal (needs an active goal).
+        if (metaOpt.isPresent()) {
+            ProyeccionMensualDTO proyeccion = proyeccionMensual(usuarioId);
+            if (!proyeccion.isEnCamino()) {
+                alertas.add(new AlertaDTO("ALERTA", "PROYECCION_BAJO_META", "MEDIA",
+                        "A este ritmo cerrarás el mes por debajo de tu meta."));
             }
         }
 
