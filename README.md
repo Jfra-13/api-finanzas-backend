@@ -8,7 +8,10 @@
 
 API REST de **Finanzas Independientes**: gestión financiera para trabajadores independientes (cohorte inicial de taxistas). Es el servidor que consume el cliente Android nativo. Maneja autenticación JWT, registro de transacciones, cálculo de cuota diaria por utilidad neta, metas mensuales, categorías y analíticas.
 
-> **Contrato de la API** (lo que consume el frontend): la fuente de verdad viva es **Swagger** (`/swagger-ui.html`). El estado de readiness y los códigos `code` por endpoint están en [README-READINESS.md](README-READINESS.md). El roadmap por fases está en [README-PLAN.md](README-PLAN.md).
+> **Documentación del proyecto:**
+> - Contrato de la API (guía de integración del cliente): [`docs/integracion-frontend.md`](docs/integracion-frontend.md) — fuente de verdad viva: **Swagger** (`/swagger-ui.html`).
+> - Target técnico (cómo debe quedar): [`docs/planeamiento/documentacion-tecnica.md`](docs/planeamiento/documentacion-tecnica.md).
+> - Plan por fases y estado del proyecto: [`docs/planeamiento/plan.md`](docs/planeamiento/plan.md).
 
 ## Requisitos
 
@@ -145,40 +148,11 @@ Toda respuesta —éxito o error— usa el mismo sobre. **El frontend decide por
 
 ### Sesión: access + refresh token
 
-- `login` y `refresh` devuelven `token` (access JWT, **15 min**) y `refreshToken` (**30 días**).
-- Rutas protegidas: header `Authorization: Bearer <token>`.
-- Ante **401** en una ruta protegida → `POST /api/v1/usuarios/refresh` con `{ "refreshToken": "..." }`.
-- El refresh **rota**: cada uso invalida el anterior. El cliente debe guardar el nuevo `refreshToken` de cada respuesta.
-- Si `/refresh` devuelve **401 `REFRESH_TOKEN_INVALIDO`** → mandar al login.
+`login`/`refresh` devuelven `token` (access JWT, 15 min) y `refreshToken` (30 días, rota en cada uso). Rutas protegidas: header `Authorization: Bearer <token>`. Detalle del flujo de refresh en [`docs/integracion-frontend.md`](docs/integracion-frontend.md).
 
 ## Endpoints
 
-### Cuenta / autenticación — `/api/v1/usuarios`
-| Método | Ruta | Descripción |
-|---|---|---|
-| POST | `/registro` | Alta de usuario |
-| POST | `/login` | Login → token + refreshToken |
-| POST | `/refresh` | Rotar tokens |
-| POST | `/forgot-password` | Enviar OTP por correo |
-| POST | `/verify-otp` | Verificar OTP |
-| POST | `/reset-password` | Cambiar password |
-| PUT | `/me/negocio` | Actualizar tipo de negocio |
-
-### Finanzas — `/api/v1/finanzas`
-| Método | Ruta | Descripción |
-|---|---|---|
-| POST/GET/PUT/DELETE | `/transacciones[/{id}]` | CRUD de transacciones (GET paginado) |
-| GET | `/cuota-diaria` | Cuota diaria recalculada por utilidad neta |
-| GET | `/hoy` | Movimientos del día |
-| GET | `/resumen-semanal` | Resumen de la semana |
-| GET | `/progreso-metas` | Progreso contra la meta |
-| GET | `/resumen-categorias` | Gasto por categoría |
-| GET | `/tendencia-mensual` | Series ingresos/egresos por mes |
-| GET | `/salud-financiera` | Indicadores de salud financiera |
-| POST/GET | `/metas[/actual]` | Fijar / consultar la meta mensual |
-| POST/GET | `/categorias` | Crear / listar categorías |
-
-El catálogo completo de códigos `code` por endpoint está en [README-READINESS.md](README-READINESS.md) y en Swagger.
+Rutas bajo `/api/v1`, en dos grupos: `usuarios` (cuenta, auth, OTP) y `finanzas` (transacciones, cuota diaria, metas, categorías, analíticas). El detalle —request/response, validaciones y códigos `code` por endpoint— está en [`docs/integracion-frontend.md`](docs/integracion-frontend.md) y, siempre actualizado, en Swagger (`/swagger-ui.html`).
 
 ## Convenciones
 
