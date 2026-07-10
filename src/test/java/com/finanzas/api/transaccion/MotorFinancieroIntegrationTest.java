@@ -75,6 +75,37 @@ class MotorFinancieroIntegrationTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.data.metaMensual").value(3000));
     }
 
+    // Contract with the app: no ad-hoc params and no active goal is a 404, not a number.
+    @Test
+    void cuotaDiaria_sinMeta_devuelve404() throws Exception {
+        Usuario usuario = crearUsuario();
+        crearTransaccion(usuario, TipoTransaccion.INGRESO, "500.00", LocalDateTime.now(), null);
+
+        mockMvc.perform(get(CUOTA).header(AUTH, tokenDe(usuario)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("META_NO_ENCONTRADA"));
+    }
+
+    @Test
+    void progresoMetas_sinMeta_devuelve404() throws Exception {
+        Usuario usuario = crearUsuario();
+
+        mockMvc.perform(get(PROGRESO).header(AUTH, tokenDe(usuario)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("META_NO_ENCONTRADA"));
+    }
+
+    // Ad-hoc params still work without a persisted goal (no 404).
+    @Test
+    void cuotaDiaria_sinMetaPeroConParams_calculaNormal() throws Exception {
+        Usuario usuario = crearUsuario();
+        crearTransaccion(usuario, TipoTransaccion.INGRESO, "1500.00", LocalDateTime.now(), null);
+
+        mockMvc.perform(get(CUOTA).header(AUTH, tokenDe(usuario)).param("meta", "3000").param("dias", "15"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value(100.00));
+    }
+
     // No query params: goal amount and working days come from the active Meta in the DB.
     @Test
     void cuotaDiaria_leeMetaYJornadaDesdeBD() throws Exception {

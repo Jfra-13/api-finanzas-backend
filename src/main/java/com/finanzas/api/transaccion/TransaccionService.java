@@ -11,6 +11,7 @@ import com.finanzas.api.transaccion.model.TipoTransaccion;
 import com.finanzas.api.transaccion.model.Transaccion;
 import com.finanzas.api.shared.exception.specific.AccesoDenegadoException;
 import com.finanzas.api.shared.exception.specific.CategoriaNoEncontradaException;
+import com.finanzas.api.shared.exception.specific.MetaNoEncontradaException;
 import com.finanzas.api.shared.exception.specific.RangoFechasInvalidoException;
 import com.finanzas.api.shared.exception.specific.TransaccionNoEncontradaException;
 import com.finanzas.api.usuario.model.Usuario;
@@ -75,6 +76,13 @@ public class TransaccionService {
                 ? metaService.obtenerMetaActual(usuarioId)
                 : Optional.empty();
 
+        // Contract with the app: without an ad-hoc goal and without an active Meta
+        // there is no quota to compute; META_NO_ENCONTRADA is the documented signal
+        // instead of a misleading number (the app renders it as "Sin meta activa").
+        if (metaMensual == null && metaActiva.isEmpty()) {
+            throw new MetaNoEncontradaException();
+        }
+
         BigDecimal meta = metaMensual != null
                 ? metaMensual
                 : metaActiva.map(Meta::getMontoObjetivo).orElse(BigDecimal.ZERO);
@@ -131,6 +139,12 @@ public class TransaccionService {
         ProgresoMetasDTO progreso = new ProgresoMetasDTO();
 
         Optional<Meta> metaActiva = (metaMensual == null) ? metaService.obtenerMetaActual(usuarioId) : Optional.empty();
+
+        // Same contract as the daily quota: no goal at all means META_NO_ENCONTRADA.
+        if (metaMensual == null && metaActiva.isEmpty()) {
+            throw new MetaNoEncontradaException();
+        }
+
         BigDecimal meta = metaMensual != null
                 ? metaMensual
                 : metaActiva.map(Meta::getMontoObjetivo).orElse(BigDecimal.ZERO);

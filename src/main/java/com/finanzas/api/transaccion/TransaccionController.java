@@ -8,6 +8,7 @@ import com.finanzas.api.transaccion.dto.TransaccionResponseDTO;
 import com.finanzas.api.transaccion.dto.TransaccionUpdateDTO;
 import com.finanzas.api.security.UsuarioPrincipal;
 import com.finanzas.api.meta.dto.ProgresoMetasDTO;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -33,6 +34,10 @@ public class TransaccionController {
         this.transaccionService = transaccionService;
     }
 
+    @Operation(summary = "Registrar transacción",
+            description = "Campos opcionales: descripcion, fecha y categoriaId. "
+                    + "CONTRATO: 'fecha' se acepta solo como ISO-8601 datetime (yyyy-MM-dd'T'HH:mm:ss); "
+                    + "una fecha sin hora es rechazada. Si se omite, se registra con la fecha/hora actual del servidor.")
     @PostMapping("/transacciones")
     public ResponseEntity<ApiResponseDTO<String>> registrarTransaccion(
             @AuthenticationPrincipal UsuarioPrincipal userPrincipal,
@@ -73,6 +78,10 @@ public class TransaccionController {
     }
 
     // Daily quota. Without params it reads goal and working days from the DB.
+    @Operation(summary = "Cuota diaria de ganancia",
+            description = "CONTRATO: el signo es parte del contrato. Valor > 0 = lo que falta ganar hoy; "
+                    + "valor <= 0 = meta del mes ya superada (el excedente se devuelve en negativo). "
+                    + "Sin meta activa y sin parámetros ad-hoc responde 404 META_NO_ENCONTRADA.")
     @GetMapping("/cuota-diaria")
     public ResponseEntity<ApiResponseDTO<BigDecimal>> consultarCuota(
             @AuthenticationPrincipal UsuarioPrincipal userPrincipal,
@@ -89,6 +98,10 @@ public class TransaccionController {
         return ResponseEntity.ok(ApiResponseDTO.success(200, "TODAY_INCOME_OK", "Ingresos de hoy obtenidos", gananciaHoy, "/api/v1/finanzas/hoy"));
     }
 
+    @Operation(summary = "Resumen de la semana en curso",
+            description = "CONTRATO: devuelve SIEMPRE exactamente 7 items en orden fijo lunes→domingo "
+                    + "(posición 0 = lunes), con ceros en los días sin movimientos. "
+                    + "El cliente indexa por posición; orden y cantidad son garantía de la API.")
     @GetMapping("/resumen-semanal")
     public ResponseEntity<ApiResponseDTO<List<DiaResumenDTO>>> consultarResumenSemanal(@AuthenticationPrincipal UsuarioPrincipal userPrincipal) {
         List<DiaResumenDTO> resumen = transaccionService.obtenerResumenSemanal(userPrincipal.getUsuario().getId());
@@ -96,6 +109,9 @@ public class TransaccionController {
     }
 
     // Progress indicators. Without params the goal comes from the DB.
+    @Operation(summary = "Progreso de metas",
+            description = "Indicadores de ingreso en BRUTO (solo ingresos); la metaDiaria sale del motor NETO. "
+                    + "Sin meta activa y sin parámetros ad-hoc responde 404 META_NO_ENCONTRADA.")
     @GetMapping("/progreso-metas")
     public ResponseEntity<ApiResponseDTO<ProgresoMetasDTO>> consultarProgresoTotal(
             @AuthenticationPrincipal UsuarioPrincipal userPrincipal,
