@@ -14,4 +14,7 @@ public interface PresupuestoRepository extends JpaRepository<Presupuesto, Long> 
     Optional<Presupuesto> findByUsuarioIdAndCategoriaId(Long usuarioId, Long categoriaId);
 
     List<Presupuesto> findByUsuarioId(Long usuarioId);
+
+    // Used when a category is deleted: a budget without its category is meaningless.
+    void deleteByCategoriaId(Long categoriaId);
 }
