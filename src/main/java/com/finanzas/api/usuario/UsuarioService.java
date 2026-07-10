@@ -5,6 +5,8 @@ import com.finanzas.api.usuario.dto.ForgotPasswordDTO;
 import com.finanzas.api.usuario.dto.LoginDTO;
 import com.finanzas.api.usuario.dto.LoginResponseDTO;
 import com.finanzas.api.usuario.dto.NegocioUpdateDTO;
+import com.finanzas.api.usuario.dto.PerfilResponseDTO;
+import com.finanzas.api.usuario.dto.PerfilUpdateDTO;
 import com.finanzas.api.usuario.dto.RefreshRequestDTO;
 import com.finanzas.api.usuario.dto.ResetPasswordDTO;
 import com.finanzas.api.usuario.dto.UsuarioRegistroDTO;
@@ -97,6 +99,12 @@ public class UsuarioService {
                 .build();
     }
 
+    // Logout is public like refresh: possession of the refresh token IS the
+    // credential, so it also works when the access token already expired.
+    public void logout(RefreshRequestDTO dto) {
+        refreshTokenService.revocar(dto.getRefreshToken());
+    }
+
     @Transactional
     public void generarOtpRecuperacion(ForgotPasswordDTO dto) {
         usuarioRepository.findByEmail(dto.getEmail()).ifPresent(usuario -> {
@@ -130,6 +138,33 @@ public class UsuarioService {
     public void actualizarNegocio(Usuario usuario, NegocioUpdateDTO dto) {
         usuario.setTipoNegocio(dto.getTipoNegocio());
         usuarioRepository.save(usuario);
+    }
+
+    public PerfilResponseDTO obtenerPerfil(Usuario usuario) {
+        return construirPerfil(usuario);
+    }
+
+    // Partial update: only non-null fields change.
+    @Transactional
+    public PerfilResponseDTO actualizarPerfil(Usuario usuario, PerfilUpdateDTO dto) {
+        if (dto.getNombre() != null) {
+            usuario.setNombre(dto.getNombre());
+        }
+        if (dto.getTelefono() != null) {
+            usuario.setTelefono(dto.getTelefono());
+        }
+        return construirPerfil(usuarioRepository.save(usuario));
+    }
+
+    private PerfilResponseDTO construirPerfil(Usuario usuario) {
+        return PerfilResponseDTO.builder()
+                .id(usuario.getId())
+                .nombre(usuario.getNombre())
+                .email(usuario.getEmail())
+                .telefono(usuario.getTelefono())
+                .tipoNegocio(usuario.getTipoNegocio())
+                // fotoUrl and plan: contract-stable placeholders, no storage yet.
+                .build();
     }
 
     // OTP flows must not leak whether an email exists: an unknown account is

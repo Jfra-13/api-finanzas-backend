@@ -69,6 +69,20 @@ public class RefreshTokenService {
         return new Rotacion(usuario, nuevoRaw);
     }
 
+    // Server-side logout: revokes the token if it exists. Idempotent by design —
+    // an unknown, expired or already-revoked token is not an error, the outcome
+    // ("this token can no longer be used") is the same.
+    @Transactional
+    public void revocar(String rawToken) {
+        if (rawToken == null || rawToken.isBlank()) {
+            return;
+        }
+        refreshTokenRepository.findByTokenHash(hash(rawToken)).ifPresent(token -> {
+            token.setRevocado(true);
+            refreshTokenRepository.save(token);
+        });
+    }
+
     private String generarValorAleatorio() {
         byte[] bytes = new byte[32];
         SECURE_RANDOM.nextBytes(bytes);

@@ -71,6 +71,9 @@ public class SecurityConfig {
                                 "/api/v1/usuarios/registro",
                                 "/api/v1/usuarios/login",
                                 "/api/v1/usuarios/refresh",
+                                // Public like refresh: possessing the refresh token is the
+                                // credential, and it must work with an expired access token.
+                                "/api/v1/usuarios/logout",
                                 "/api/v1/usuarios/forgot-password",
                                 "/api/v1/usuarios/verify-otp",
                                 "/api/v1/usuarios/reset-password"

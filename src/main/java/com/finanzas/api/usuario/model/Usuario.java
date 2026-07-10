@@ -46,4 +46,7 @@ public class Usuario {
     // Este campo guardará "BODEGA", "TAXI", "FREELANCE" o "PERSONALIZADO"
     @Column(name = "tipo_negocio")
     private String tipoNegocio;
+
+    @Column(length = 20)
+    private String telefono;
 }

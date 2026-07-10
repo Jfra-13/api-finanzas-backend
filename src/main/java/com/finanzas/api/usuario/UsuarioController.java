@@ -9,7 +9,10 @@ import com.finanzas.api.usuario.dto.ForgotPasswordDTO;
 import com.finanzas.api.usuario.dto.VerifyOtpDTO;
 import com.finanzas.api.usuario.dto.ResetPasswordDTO;
 import com.finanzas.api.usuario.dto.NegocioUpdateDTO;
+import com.finanzas.api.usuario.dto.PerfilResponseDTO;
+import com.finanzas.api.usuario.dto.PerfilUpdateDTO;
 import com.finanzas.api.security.UsuarioPrincipal;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -59,6 +62,37 @@ public class UsuarioController {
     public ResponseEntity<ApiResponseDTO<String>> resetPassword(@Valid @RequestBody ResetPasswordDTO dto) {
         usuarioService.resetPassword(dto);
         return ResponseEntity.ok(ApiResponseDTO.success(200, "PASSWORD_RESET_SUCCESS", "Contraseña actualizada exitosamente", null, "/api/v1/usuarios/reset-password"));
+    }
+
+    @Operation(summary = "Perfil del usuario autenticado",
+            description = "Única fuente para la cabecera de Perfil y el detalle de Cuenta. "
+                    + "telefono, fotoUrl y plan son nullable; fotoUrl y plan aún no tienen backend y llegan null.")
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponseDTO<PerfilResponseDTO>> obtenerPerfil(
+            @AuthenticationPrincipal UsuarioPrincipal userPrincipal) {
+        PerfilResponseDTO perfil = usuarioService.obtenerPerfil(userPrincipal.getUsuario());
+        return ResponseEntity.ok(ApiResponseDTO.success(200, "PROFILE_OK", "Perfil obtenido", perfil, "/api/v1/usuarios/me"));
+    }
+
+    @Operation(summary = "Actualizar perfil (parcial)",
+            description = "Solo cambian los campos presentes en el body (nombre, telefono). "
+                    + "El email no es editable; tipoNegocio tiene su propio endpoint.")
+    @PutMapping("/me")
+    public ResponseEntity<ApiResponseDTO<PerfilResponseDTO>> actualizarPerfil(
+            @AuthenticationPrincipal UsuarioPrincipal userPrincipal,
+            @Valid @RequestBody PerfilUpdateDTO dto) {
+        PerfilResponseDTO perfil = usuarioService.actualizarPerfil(userPrincipal.getUsuario(), dto);
+        return ResponseEntity.ok(ApiResponseDTO.success(200, "PROFILE_UPDATED", "Perfil actualizado", perfil, "/api/v1/usuarios/me"));
+    }
+
+    @Operation(summary = "Cerrar sesión (revoca el refresh token)",
+            description = "Revoca el refresh token en el servidor. Idempotente: un token desconocido o ya "
+                    + "revocado también responde 200 LOGGED_OUT. El access token sigue válido hasta su "
+                    + "expiración (15 min); el cliente debe descartarlo localmente.")
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponseDTO<String>> logout(@Valid @RequestBody RefreshRequestDTO dto) {
+        usuarioService.logout(dto);
+        return ResponseEntity.ok(ApiResponseDTO.success(200, "LOGGED_OUT", "Sesión cerrada", null, "/api/v1/usuarios/logout"));
     }
 
     @PutMapping("/me/negocio")
