@@ -24,6 +24,9 @@ class AnaliticaIntegrationTest extends IntegrationTestSupport {
     private static final String PROYECCION = "/api/v1/finanzas/proyeccion-mensual";
     private static final String TENDENCIA = "/api/v1/finanzas/tendencia-mensual";
     private static final String SALUD = "/api/v1/finanzas/salud-financiera";
+    private static final String RESUMEN_DIARIO = "/api/v1/finanzas/resumen-diario";
+    private static final String TENDENCIA_GRAN = "/api/v1/finanzas/tendencia";
+    private static final String DIA_SEMANA = "/api/v1/finanzas/ingresos-por-dia-semana";
 
     @Test
     void resumenCategorias_agrupaEgresosYBucketSinCategoria() throws Exception {
@@ -219,6 +222,106 @@ class AnaliticaIntegrationTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.data.egresos[2]").value(200.00));
     }
 
+    // Only days with movements come back, ascending, with both totals per day.
+    @Test
+    void resumenDiario_devuelveSoloDiasConActividad() throws Exception {
+        Usuario usuario = crearUsuario();
+        LocalDate dia1 = LocalDate.now().withDayOfMonth(1);
+        LocalDate dia3 = LocalDate.now().withDayOfMonth(3);
+        crearTransaccion(usuario, TipoTransaccion.INGRESO, "100.00", dia1.atTime(10, 0), null);
+        crearTransaccion(usuario, TipoTransaccion.EGRESO, "40.00", dia1.atTime(15, 0), null);
+        crearTransaccion(usuario, TipoTransaccion.INGRESO, "200.00", dia3.atTime(9, 0), null);
+
+        mockMvc.perform(get(RESUMEN_DIARIO).header(AUTH, tokenDe(usuario))
+                        .param("mes", periodoActual()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("DAILY_SUMMARY_OK"))
+                .andExpect(jsonPath("$.data", hasSize(2)))
+                .andExpect(jsonPath("$.data[0].fecha").value(dia1.toString()))
+                .andExpect(jsonPath("$.data[0].ingresos").value(100.00))
+                .andExpect(jsonPath("$.data[0].egresos").value(40.00))
+                .andExpect(jsonPath("$.data[1].fecha").value(dia3.toString()))
+                .andExpect(jsonPath("$.data[1].ingresos").value(200.00));
+    }
+
+    @Test
+    void resumenDiario_mesSinActividad_devuelveListaVacia() throws Exception {
+        Usuario usuario = crearUsuario();
+
+        mockMvc.perform(get(RESUMEN_DIARIO).header(AUTH, tokenDe(usuario)).param("mes", "2020-01"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data", hasSize(0)));
+    }
+
+    @Test
+    void resumenDiario_mesInvalido_devuelve400() throws Exception {
+        Usuario usuario = crearUsuario();
+
+        mockMvc.perform(get(RESUMEN_DIARIO).header(AUTH, tokenDe(usuario)).param("mes", "julio-2026"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("PARAMETRO_INVALIDO"));
+    }
+
+    @Test
+    void tendencia_granularidadMes_equivaleATendenciaMensual() throws Exception {
+        Usuario usuario = crearUsuario();
+        crearTransaccion(usuario, TipoTransaccion.INGRESO, "500.00", LocalDateTime.now(), null);
+
+        mockMvc.perform(get(TENDENCIA_GRAN).header(AUTH, tokenDe(usuario))
+                        .param("granularidad", "MES").param("ventana", "3"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("TREND_OK"))
+                .andExpect(jsonPath("$.data.periodos", hasSize(3)))
+                .andExpect(jsonPath("$.data.periodos[2]").value(periodoActual()))
+                .andExpect(jsonPath("$.data.ingresos[2]").value(500.00));
+    }
+
+    @Test
+    void tendencia_granularidadSemana_rotulaConLunes() throws Exception {
+        Usuario usuario = crearUsuario();
+        crearTransaccion(usuario, TipoTransaccion.INGRESO, "300.00", LocalDateTime.now(), null);
+        LocalDate lunesActual = LocalDate.now().with(
+                java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY));
+
+        mockMvc.perform(get(TENDENCIA_GRAN).header(AUTH, tokenDe(usuario))
+                        .param("granularidad", "SEMANA").param("ventana", "4"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.periodos", hasSize(4)))
+                // Current week is last and labeled with its Monday.
+                .andExpect(jsonPath("$.data.periodos[3]").value(lunesActual.toString()))
+                .andExpect(jsonPath("$.data.ingresos[3]").value(300.00));
+    }
+
+    @Test
+    void tendencia_granularidadInvalida_devuelve400() throws Exception {
+        Usuario usuario = crearUsuario();
+
+        mockMvc.perform(get(TENDENCIA_GRAN).header(AUTH, tokenDe(usuario)).param("granularidad", "DIA"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("PARAMETRO_INVALIDO"));
+    }
+
+    // Positional contract: always 7 items Monday-first, accent-free uppercase codes.
+    @Test
+    void ingresosPorDiaSemana_siempre7ItemsDesdeLunes() throws Exception {
+        Usuario usuario = crearUsuario();
+        LocalDate lunesActual = LocalDate.now().with(
+                java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY));
+        // Income on this week's Monday and on last week's Monday: both land in bucket 0.
+        crearTransaccion(usuario, TipoTransaccion.INGRESO, "100.00", lunesActual.atTime(8, 0), null);
+        crearTransaccion(usuario, TipoTransaccion.INGRESO, "150.00", lunesActual.minusWeeks(1).atTime(8, 0), null);
+        // Expenses never count here.
+        crearTransaccion(usuario, TipoTransaccion.EGRESO, "999.00", lunesActual.atTime(9, 0), null);
+
+        mockMvc.perform(get(DIA_SEMANA).header(AUTH, tokenDe(usuario)).param("ventana", "4"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("WEEKDAY_INCOME_OK"))
+                .andExpect(jsonPath("$.data", hasSize(7)))
+                .andExpect(jsonPath("$.data[0].dia").value("LUNES"))
+                .andExpect(jsonPath("$.data[0].ingresos").value(250.00))
+                .andExpect(jsonPath("$.data[6].dia").value("DOMINGO"));
+    }
+
     @Test
     void saludFinanciera_reglaFelicitacionMetaCerca() throws Exception {
         Usuario usuario = crearUsuario();
@@ -242,6 +345,19 @@ class AnaliticaIntegrationTest extends IntegrationTestSupport {
         mockMvc.perform(get(SALUD).header(AUTH, tokenDe(usuario)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[?(@.code=='GASTO_DIARIO_ALTO')]", hasSize(1)));
+    }
+
+    // Health must keep working without a goal: quota rules are skipped, the rest run.
+    @Test
+    void saludFinanciera_sinMeta_evaluaReglasNoDependientesDeMeta() throws Exception {
+        Usuario usuario = crearUsuario();
+        LocalDateTime ahora = LocalDateTime.now();
+        crearTransaccion(usuario, TipoTransaccion.INGRESO, "100.00", ahora, null);
+        crearTransaccion(usuario, TipoTransaccion.EGRESO, "300.00", ahora, null); // expenses beat income
+
+        mockMvc.perform(get(SALUD).header(AUTH, tokenDe(usuario)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[?(@.code=='EGRESOS_SUPERAN_INGRESOS')]", hasSize(1)));
     }
 
     @Test

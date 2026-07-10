@@ -3,21 +3,29 @@ package com.finanzas.api.transaccion;
 import com.finanzas.api.meta.MetaService;
 import com.finanzas.api.meta.model.Meta;
 import com.finanzas.api.shared.exception.specific.MetaNoEncontradaException;
+import com.finanzas.api.shared.exception.specific.ParametroInvalidoException;
 import com.finanzas.api.shared.exception.specific.RangoFechasInvalidoException;
 import com.finanzas.api.transaccion.dto.AlertaDTO;
 import com.finanzas.api.transaccion.dto.ComparacionCategoriasDTO;
+import com.finanzas.api.transaccion.dto.DiaActividadDTO;
+import com.finanzas.api.transaccion.dto.DiaSemanaIngresoDTO;
 import com.finanzas.api.transaccion.dto.PresupuestoResponseDTO;
 import com.finanzas.api.transaccion.dto.ProyeccionMensualDTO;
+import com.finanzas.api.transaccion.dto.TendenciaDTO;
 import com.finanzas.api.transaccion.dto.TendenciaMensualDTO;
 import com.finanzas.api.transaccion.model.TipoTransaccion;
+import com.finanzas.api.transaccion.model.Transaccion;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.sql.Date;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -215,6 +223,93 @@ public class AnaliticaService {
         return new TendenciaMensualDTO(etiquetas, ingresos, egresos);
     }
 
+    // D. Calendar feed: days with activity inside one month, ascending. Days
+    // without movements are omitted; the client paints them as empty.
+    public List<DiaActividadDTO> resumenDiario(Long usuarioId, YearMonth mes) {
+        YearMonth objetivo = mes != null ? mes : YearMonth.now();
+        LocalDateTime inicio = objetivo.atDay(1).atStartOfDay();
+        LocalDateTime fin = objetivo.plusMonths(1).atDay(1).atStartOfDay();
+
+        List<DiaActividadDTO> dias = new ArrayList<>();
+        for (Object[] fila : transaccionRepository.resumenPorDia(usuarioId, inicio, fin)) {
+            dias.add(new DiaActividadDTO(aLocalDate(fila[0]), (BigDecimal) fila[1], (BigDecimal) fila[2]));
+        }
+        return dias;
+    }
+
+    // CAST(... AS date) comes back as java.sql.Date on H2 and may be LocalDate on
+    // other dialects; normalize instead of assuming one.
+    private LocalDate aLocalDate(Object valor) {
+        if (valor instanceof LocalDate localDate) {
+            return localDate;
+        }
+        if (valor instanceof Date sqlDate) {
+            return sqlDate.toLocalDate();
+        }
+        throw new IllegalStateException("Unexpected date type: " + valor.getClass());
+    }
+
+    // E. Trend with configurable bucketing. MES reuses the monthly aggregation
+    // (labels yyyy-MM); SEMANA buckets by ISO week, labeled with the Monday that
+    // starts it (yyyy-MM-dd). Oldest bucket first, current period always last.
+    public TendenciaDTO tendencia(Long usuarioId, String granularidad, Integer ventana) {
+        String gran = granularidad == null ? "MES" : granularidad.toUpperCase();
+        int n = Math.max(1, ventana != null ? ventana : 6);
+
+        if ("MES".equals(gran)) {
+            TendenciaMensualDTO mensual = tendenciaMensual(usuarioId, n);
+            return new TendenciaDTO(mensual.getMeses(), mensual.getIngresos(), mensual.getEgresos());
+        }
+        if (!"SEMANA".equals(gran)) {
+            throw new ParametroInvalidoException("granularidad debe ser SEMANA o MES");
+        }
+
+        List<String> periodos = new ArrayList<>();
+        List<BigDecimal> ingresos = new ArrayList<>();
+        List<BigDecimal> egresos = new ArrayList<>();
+
+        LocalDate lunesActual = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        for (int i = n - 1; i >= 0; i--) {
+            LocalDate lunes = lunesActual.minusWeeks(i);
+            LocalDateTime inicio = lunes.atStartOfDay();
+            LocalDateTime fin = lunes.plusWeeks(1).atStartOfDay();
+
+            periodos.add(lunes.toString());
+            ingresos.add(transaccionRepository.sumarPorTipoYRango(usuarioId, TipoTransaccion.INGRESO, inicio, fin));
+            egresos.add(transaccionRepository.sumarPorTipoYRango(usuarioId, TipoTransaccion.EGRESO, inicio, fin));
+        }
+        return new TendenciaDTO(periodos, ingresos, egresos);
+    }
+
+    // F. Income per weekday aggregated over the last N weeks (current week included).
+    // Always 7 items, Monday first — same positional contract as resumen-semanal.
+    public List<DiaSemanaIngresoDTO> ingresosPorDiaSemana(Long usuarioId, Integer ventana) {
+        int semanas = Math.max(1, ventana != null ? ventana : 4);
+
+        LocalDate lunesActual = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        LocalDateTime inicio = lunesActual.minusWeeks(semanas - 1).atStartOfDay();
+        LocalDateTime fin = lunesActual.plusWeeks(1).atStartOfDay();
+
+        BigDecimal[] totales = new BigDecimal[7];
+        java.util.Arrays.fill(totales, BigDecimal.ZERO);
+
+        // ponytail: in-memory aggregation to stay portable across H2/PostgreSQL
+        // weekday functions; switch to a grouped query if windows grow past months.
+        for (Transaccion t : transaccionRepository.obtenerTransaccionesPorRango(usuarioId, inicio, fin)) {
+            if (t.getTipo() == TipoTransaccion.INGRESO) {
+                int index = t.getFecha().getDayOfWeek().getValue() - 1;
+                totales[index] = totales[index].add(t.getMonto());
+            }
+        }
+
+        String[] nombres = {"LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"};
+        List<DiaSemanaIngresoDTO> resultado = new ArrayList<>(7);
+        for (int i = 0; i < 7; i++) {
+            resultado.add(new DiaSemanaIngresoDTO(nombres[i], totales[i]));
+        }
+        return resultado;
+    }
+
     // C. Financial health: a fixed, deterministic set of three rules.
     public List<AlertaDTO> saludFinanciera(Long usuarioId) {
         List<AlertaDTO> alertas = new ArrayList<>();
@@ -224,7 +319,11 @@ public class AnaliticaService {
         String diasCsv = metaOpt.map(Meta::getDiasLaborables).orElse(null);
 
         BigDecimal utilidadNeta = transaccionService.utilidadNetaDelMes(usuarioId);
-        BigDecimal cuotaDiaria = transaccionService.obtenerCuotaDiaria(usuarioId, null, null);
+        // Without an active goal the quota endpoint throws META_NO_ENCONTRADA; here a
+        // zero quota simply disables the quota-based rules (1 and 3) and keeps the rest.
+        BigDecimal cuotaDiaria = metaOpt.isPresent()
+                ? transaccionService.obtenerCuotaDiaria(usuarioId, null, null)
+                : BigDecimal.ZERO;
 
         // Rule 1: today's expenses exceed the daily profit quota.
         if (cuotaDiaria.signum() > 0 && egresosHoy(usuarioId).compareTo(cuotaDiaria) > 0) {
