@@ -47,16 +47,21 @@ public class TransaccionController {
     }
 
     // Paged history; newest first by default. Optional type/category/date-range filters.
+    @Operation(summary = "Historial de transacciones",
+            description = "CONTRATO: 'sinCategoria=true' filtra solo las transacciones sin categoría; "
+                    + "'sinCategoria=false' u omitido no filtra (NO significa 'solo categorizadas'). "
+                    + "Combinar 'sinCategoria=true' con 'categoriaId' responde 400 PARAMETRO_INVALIDO.")
     @GetMapping("/transacciones")
     public ResponseEntity<ApiResponseDTO<Page<TransaccionResponseDTO>>> listarTransacciones(
             @AuthenticationPrincipal UsuarioPrincipal userPrincipal,
             @RequestParam(required = false) String tipo,
             @RequestParam(required = false) Long categoriaId,
+            @RequestParam(required = false) Boolean sinCategoria,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
             @PageableDefault(sort = "fecha", direction = Sort.Direction.DESC) Pageable pageable) {
         Page<TransaccionResponseDTO> historial = transaccionService.listar(
-                userPrincipal.getUsuario().getId(), tipo, categoriaId, desde, hasta, pageable);
+                userPrincipal.getUsuario().getId(), tipo, categoriaId, sinCategoria, desde, hasta, pageable);
         return ResponseEntity.ok(ApiResponseDTO.success(200, "TRANSACTIONS_OK", "Historial obtenido", historial, TX_PATH));
     }
 

@@ -93,15 +93,19 @@ public interface TransaccionRepository extends JpaRepository<Transaccion, Long> 
     // Paged history with optional type/category/date-range filters; sort comes from
     // Pageable. Range bounds are half-open: [desde, hasta), so the caller passes the
     // exclusive upper bound (start of the day after the inclusive 'hasta').
+    // 'sinCategoria' is either true (only uncategorized rows) or null (no filter);
+    // the service never passes false, so the query only needs the two-state check.
     @Query("SELECT t FROM Transaccion t WHERE t.usuario.id = :usuarioId " +
             "AND (:tipo IS NULL OR t.tipo = :tipo) " +
             "AND (:categoriaId IS NULL OR t.categoria.id = :categoriaId) " +
+            "AND (:sinCategoria IS NULL OR t.categoria IS NULL) " +
             "AND (:desde IS NULL OR t.fecha >= :desde) " +
             "AND (:hasta IS NULL OR t.fecha < :hasta)")
     Page<Transaccion> buscar(
             @Param("usuarioId") Long usuarioId,
             @Param("tipo") TipoTransaccion tipo,
             @Param("categoriaId") Long categoriaId,
+            @Param("sinCategoria") Boolean sinCategoria,
             @Param("desde") LocalDateTime desde,
             @Param("hasta") LocalDateTime hasta,
             Pageable pageable

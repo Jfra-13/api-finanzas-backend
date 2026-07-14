@@ -67,6 +67,44 @@ class TransaccionCrudIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
+    void listar_sinCategoriaTrue_soloDevuelveNoCategorizadas() throws Exception {
+        Usuario usuario = crearUsuario();
+        Categoria gasolina = crearCategoria("Gasolina", TipoTransaccion.EGRESO, null);
+        LocalDateTime ahora = LocalDateTime.now();
+        crearTransaccion(usuario, TipoTransaccion.EGRESO, "80.00", ahora, gasolina);
+        crearTransaccion(usuario, TipoTransaccion.EGRESO, "30.00", ahora, null);
+
+        mockMvc.perform(get(TX).header(AUTH, tokenDe(usuario)).param("sinCategoria", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content", hasSize(1)))
+                .andExpect(jsonPath("$.data.content[0].monto").value(30.00));
+    }
+
+    // Contract: 'sinCategoria=false' means "no filter", not "only categorized".
+    @Test
+    void listar_sinCategoriaFalse_noFiltra() throws Exception {
+        Usuario usuario = crearUsuario();
+        Categoria gasolina = crearCategoria("Gasolina", TipoTransaccion.EGRESO, null);
+        LocalDateTime ahora = LocalDateTime.now();
+        crearTransaccion(usuario, TipoTransaccion.EGRESO, "80.00", ahora, gasolina);
+        crearTransaccion(usuario, TipoTransaccion.EGRESO, "30.00", ahora, null);
+
+        mockMvc.perform(get(TX).header(AUTH, tokenDe(usuario)).param("sinCategoria", "false"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content", hasSize(2)));
+    }
+
+    @Test
+    void listar_sinCategoriaConCategoriaId_devuelve400() throws Exception {
+        Usuario usuario = crearUsuario();
+        mockMvc.perform(get(TX).header(AUTH, tokenDe(usuario))
+                        .param("sinCategoria", "true")
+                        .param("categoriaId", "1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("PARAMETRO_INVALIDO"));
+    }
+
+    @Test
     void actualizar_propia_ok() throws Exception {
         Usuario usuario = crearUsuario();
         Transaccion tx = crearTransaccion(usuario, TipoTransaccion.INGRESO, "100.00", LocalDateTime.now(), null);
