@@ -96,19 +96,21 @@ public class UsuarioController {
         return ResponseEntity.ok(ApiResponseDTO.success(200, "LOGGED_OUT", "Sesión cerrada", null, "/api/v1/usuarios/logout"));
     }
 
+    // POST instead of DELETE-with-body on purpose: Retrofit needs a nonstandard
+    // @HTTP hack for a DELETE body and some proxies drop it altogether.
     @Operation(summary = "Eliminar cuenta (soft-delete con 30 días de gracia)",
             description = "CONTRATO: requiere la contraseña en el body para confirmar identidad; incorrecta "
-                    + "responde 401 CREDENCIALES_INVALIDAS. La cuenta se marca como eliminada y se revocan "
-                    + "todos los refresh tokens (el access token vigente expira solo, máx. 15 min). "
-                    + "Iniciar sesión dentro de los 30 días de gracia REACTIVA la cuenta con todos sus datos; "
-                    + "pasado ese plazo el login responde 404 USUARIO_NO_ENCONTRADO y los datos se purgan "
-                    + "definitivamente.")
-    @DeleteMapping("/me")
+                    + "responde 401 CREDENCIALES_INVALIDAS. La cuenta se marca como eliminada, se revocan "
+                    + "todos los refresh tokens y el access token vigente deja de ser aceptado de inmediato. "
+                    + "Iniciar sesión dentro de los 30 días de gracia REACTIVA la cuenta con todos sus datos "
+                    + "(la respuesta de login lo indica con cuentaReactivada=true); pasado ese plazo el login "
+                    + "responde 404 USUARIO_NO_ENCONTRADO y los datos se purgan definitivamente.")
+    @PostMapping("/me/eliminar")
     public ResponseEntity<ApiResponseDTO<String>> eliminarCuenta(
             @AuthenticationPrincipal UsuarioPrincipal userPrincipal,
             @Valid @RequestBody EliminarCuentaDTO dto) {
         usuarioService.eliminarCuenta(userPrincipal.getUsuario(), dto);
-        return ResponseEntity.ok(ApiResponseDTO.success(200, "ACCOUNT_DELETED", "Cuenta eliminada", null, "/api/v1/usuarios/me"));
+        return ResponseEntity.ok(ApiResponseDTO.success(200, "ACCOUNT_DELETED", "Cuenta eliminada", null, "/api/v1/usuarios/me/eliminar"));
     }
 
     @PutMapping("/me/negocio")

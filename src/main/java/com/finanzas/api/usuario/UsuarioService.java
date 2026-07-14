@@ -78,11 +78,11 @@ public class UsuarioService {
 
         UsuarioPrincipal userPrincipal = (UsuarioPrincipal) authentication.getPrincipal();
         Usuario usuario = userPrincipal.getUsuario();
-        reactivarSiEnGracia(usuario);
+        boolean reactivada = reactivarSiEnGracia(usuario);
         String jwtToken = jwtService.generateToken(userPrincipal);
         String refreshToken = refreshTokenService.emitir(usuario);
 
-        return construirRespuesta(usuario, jwtToken, refreshToken);
+        return construirRespuesta(usuario, jwtToken, refreshToken, reactivada);
     }
 
     // Exchanges a valid refresh token for a fresh access token and a rotated
@@ -91,10 +91,10 @@ public class UsuarioService {
         RefreshTokenService.Rotacion rotacion = refreshTokenService.rotar(dto.getRefreshToken());
         Usuario usuario = rotacion.usuario();
         String jwtToken = jwtService.generateToken(new UsuarioPrincipal(usuario));
-        return construirRespuesta(usuario, jwtToken, rotacion.rawToken());
+        return construirRespuesta(usuario, jwtToken, rotacion.rawToken(), false);
     }
 
-    private LoginResponseDTO construirRespuesta(Usuario usuario, String accessToken, String refreshToken) {
+    private LoginResponseDTO construirRespuesta(Usuario usuario, String accessToken, String refreshToken, boolean cuentaReactivada) {
         return LoginResponseDTO.builder()
                 .token(accessToken)
                 .refreshToken(refreshToken)
@@ -102,6 +102,7 @@ public class UsuarioService {
                 .nombre(usuario.getNombre())
                 .email(usuario.getEmail())
                 .tipoNegocio(usuario.getTipoNegocio())
+                .cuentaReactivada(cuentaReactivada)
                 .build();
     }
 
@@ -126,16 +127,18 @@ public class UsuarioService {
 
     // A soft-deleted account inside the grace window is reactivated by the login
     // itself (no extra endpoint); past the window it behaves as if it no longer
-    // existed — the purge job will remove it.
-    private void reactivarSiEnGracia(Usuario usuario) {
+    // existed — the purge job will remove it. Returns whether a reactivation
+    // actually happened so the response can tell the client about it.
+    private boolean reactivarSiEnGracia(Usuario usuario) {
         if (usuario.getEliminadoEn() == null) {
-            return;
+            return false;
         }
         if (usuario.getEliminadoEn().plusDays(DIAS_GRACIA_ELIMINACION).isBefore(LocalDateTime.now())) {
             throw new UsuarioNoEncontradoException();
         }
         usuario.setEliminadoEn(null);
         usuarioRepository.save(usuario);
+        return true;
     }
 
     @Transactional

@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -42,7 +42,7 @@ class CuentaEliminacionIntegrationTest extends IntegrationTestSupport {
         String login = registrarYLoguear("borrar1@test.com");
         String token = "Bearer " + JsonPath.read(login, "$.data.token");
 
-        mockMvc.perform(delete(USUARIOS + "/me").header(AUTH, token).contentType(APPLICATION_JSON)
+        mockMvc.perform(post(USUARIOS + "/me/eliminar").header(AUTH, token).contentType(APPLICATION_JSON)
                         .content("{\"password\":\"equivocada\"}"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("CREDENCIALES_INVALIDAS"));
@@ -54,7 +54,7 @@ class CuentaEliminacionIntegrationTest extends IntegrationTestSupport {
         String token = "Bearer " + JsonPath.read(login, "$.data.token");
         String refreshToken = JsonPath.read(login, "$.data.refreshToken");
 
-        mockMvc.perform(delete(USUARIOS + "/me").header(AUTH, token).contentType(APPLICATION_JSON)
+        mockMvc.perform(post(USUARIOS + "/me/eliminar").header(AUTH, token).contentType(APPLICATION_JSON)
                         .content("{\"password\":\"" + PASSWORD + "\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("ACCOUNT_DELETED"));
@@ -63,18 +63,30 @@ class CuentaEliminacionIntegrationTest extends IntegrationTestSupport {
         Usuario usuario = usuarioRepository.findByEmail("borrar2@test.com").orElseThrow();
         assertTrue(usuario.getEliminadoEn() != null);
 
-        // ...every session is dead...
+        // ...the still-valid access token is rejected right away...
+        mockMvc.perform(get(USUARIOS + "/me").header(AUTH, token))
+                .andExpect(status().isUnauthorized());
+
+        // ...every refresh session is dead...
         mockMvc.perform(post(USUARIOS + "/refresh").contentType(APPLICATION_JSON)
                         .content("{\"refreshToken\":\"" + refreshToken + "\"}"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("REFRESH_TOKEN_INVALIDO"));
 
-        // ...and logging back in within the grace period reactivates the account.
+        // ...and logging back in within the grace period reactivates the account,
+        // flagging the reactivation so the client can inform the user.
         mockMvc.perform(post(USUARIOS + "/login").contentType(APPLICATION_JSON)
                         .content("{\"email\":\"borrar2@test.com\",\"password\":\"" + PASSWORD + "\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value("LOGIN_SUCCESS"));
+                .andExpect(jsonPath("$.code").value("LOGIN_SUCCESS"))
+                .andExpect(jsonPath("$.data.cuentaReactivada").value(true));
         assertNull(usuarioRepository.findByEmail("borrar2@test.com").orElseThrow().getEliminadoEn());
+
+        // A normal login never carries the flag.
+        mockMvc.perform(post(USUARIOS + "/login").contentType(APPLICATION_JSON)
+                        .content("{\"email\":\"borrar2@test.com\",\"password\":\"" + PASSWORD + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.cuentaReactivada").value(false));
     }
 
     @Test

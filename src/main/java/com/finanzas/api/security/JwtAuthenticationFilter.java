@@ -46,7 +46,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             final String userEmail = jwtService.extractUsername(jwt);
             if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
-                if (jwtService.isTokenValid(jwt, userDetails)) {
+                // A soft-deleted account loses API access immediately, even though its
+                // access token is still cryptographically valid for up to 15 minutes.
+                // Login (a public route) stays the only way back in during the grace
+                // period, where it reactivates the account.
+                boolean cuentaEliminada = userDetails instanceof UsuarioPrincipal principal
+                        && principal.getUsuario().getEliminadoEn() != null;
+                if (!cuentaEliminada && jwtService.isTokenValid(jwt, userDetails)) {
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                             userDetails,
                             null,
