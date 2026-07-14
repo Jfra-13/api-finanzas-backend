@@ -2,6 +2,7 @@ package com.finanzas.api.transaccion;
 
 import com.finanzas.api.transaccion.model.Categoria;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -21,4 +22,9 @@ public interface CategoriaRepository extends JpaRepository<Categoria, Long> {
     @Query("SELECT c FROM Categoria c WHERE c.id = :id " +
             "AND (c.usuario IS NULL OR c.usuario.id = :usuarioId)")
     Optional<Categoria> findVisible(@Param("id") Long id, @Param("usuarioId") Long usuarioId);
+
+    // Account purge: removes only the user's own categories; base ones stay.
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM Categoria c WHERE c.usuario.id = :usuarioId")
+    int eliminarDeUsuario(@Param("usuarioId") Long usuarioId);
 }

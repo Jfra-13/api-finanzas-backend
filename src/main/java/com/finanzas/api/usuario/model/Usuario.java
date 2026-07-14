@@ -49,4 +49,9 @@ public class Usuario {
 
     @Column(length = 20)
     private String telefono;
+
+    // Soft-delete marker: null = active. Set by DELETE /me; cleared when the user
+    // logs back in within the grace period; purged permanently after it expires.
+    @Column(name = "eliminado_en")
+    private LocalDateTime eliminadoEn;
 }

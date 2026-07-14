@@ -83,6 +83,13 @@ public class RefreshTokenService {
         });
     }
 
+    // Account deletion: every live session dies immediately. The access token
+    // keeps its remaining <=15 min of life, same tradeoff documented on logout.
+    @Transactional
+    public void revocarTodosDe(Long usuarioId) {
+        refreshTokenRepository.revocarTodosDeUsuario(usuarioId);
+    }
+
     private String generarValorAleatorio() {
         byte[] bytes = new byte[32];
         SECURE_RANDOM.nextBytes(bytes);

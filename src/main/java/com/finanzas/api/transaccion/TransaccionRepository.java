@@ -110,4 +110,9 @@ public interface TransaccionRepository extends JpaRepository<Transaccion, Long> 
             @Param("hasta") LocalDateTime hasta,
             Pageable pageable
     );
+
+    // Account purge: removes the user's whole movement history in one statement.
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM Transaccion t WHERE t.usuario.id = :usuarioId")
+    int eliminarDeUsuario(@Param("usuarioId") Long usuarioId);
 }

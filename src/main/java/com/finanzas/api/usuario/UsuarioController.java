@@ -8,6 +8,7 @@ import com.finanzas.api.usuario.dto.RefreshRequestDTO;
 import com.finanzas.api.usuario.dto.ForgotPasswordDTO;
 import com.finanzas.api.usuario.dto.VerifyOtpDTO;
 import com.finanzas.api.usuario.dto.ResetPasswordDTO;
+import com.finanzas.api.usuario.dto.EliminarCuentaDTO;
 import com.finanzas.api.usuario.dto.NegocioUpdateDTO;
 import com.finanzas.api.usuario.dto.PerfilResponseDTO;
 import com.finanzas.api.usuario.dto.PerfilUpdateDTO;
@@ -93,6 +94,21 @@ public class UsuarioController {
     public ResponseEntity<ApiResponseDTO<String>> logout(@Valid @RequestBody RefreshRequestDTO dto) {
         usuarioService.logout(dto);
         return ResponseEntity.ok(ApiResponseDTO.success(200, "LOGGED_OUT", "Sesión cerrada", null, "/api/v1/usuarios/logout"));
+    }
+
+    @Operation(summary = "Eliminar cuenta (soft-delete con 30 días de gracia)",
+            description = "CONTRATO: requiere la contraseña en el body para confirmar identidad; incorrecta "
+                    + "responde 401 CREDENCIALES_INVALIDAS. La cuenta se marca como eliminada y se revocan "
+                    + "todos los refresh tokens (el access token vigente expira solo, máx. 15 min). "
+                    + "Iniciar sesión dentro de los 30 días de gracia REACTIVA la cuenta con todos sus datos; "
+                    + "pasado ese plazo el login responde 404 USUARIO_NO_ENCONTRADO y los datos se purgan "
+                    + "definitivamente.")
+    @DeleteMapping("/me")
+    public ResponseEntity<ApiResponseDTO<String>> eliminarCuenta(
+            @AuthenticationPrincipal UsuarioPrincipal userPrincipal,
+            @Valid @RequestBody EliminarCuentaDTO dto) {
+        usuarioService.eliminarCuenta(userPrincipal.getUsuario(), dto);
+        return ResponseEntity.ok(ApiResponseDTO.success(200, "ACCOUNT_DELETED", "Cuenta eliminada", null, "/api/v1/usuarios/me"));
     }
 
     @PutMapping("/me/negocio")

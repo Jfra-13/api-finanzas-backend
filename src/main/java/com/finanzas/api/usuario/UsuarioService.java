@@ -1,6 +1,7 @@
 package com.finanzas.api.usuario;
 
 import com.finanzas.api.shared.exception.specific.*;
+import com.finanzas.api.usuario.dto.EliminarCuentaDTO;
 import com.finanzas.api.usuario.dto.ForgotPasswordDTO;
 import com.finanzas.api.usuario.dto.LoginDTO;
 import com.finanzas.api.usuario.dto.LoginResponseDTO;
@@ -26,6 +27,10 @@ import java.time.LocalDateTime;
 
 @Service
 public class UsuarioService {
+
+    // Grace window for soft-deleted accounts: logging in within it reactivates
+    // the account; after it, the purge job removes the user permanently.
+    public static final int DIAS_GRACIA_ELIMINACION = 30;
 
     private static final int MAX_OTP_ATTEMPTS = 5;
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
@@ -73,6 +78,7 @@ public class UsuarioService {
 
         UsuarioPrincipal userPrincipal = (UsuarioPrincipal) authentication.getPrincipal();
         Usuario usuario = userPrincipal.getUsuario();
+        reactivarSiEnGracia(usuario);
         String jwtToken = jwtService.generateToken(userPrincipal);
         String refreshToken = refreshTokenService.emitir(usuario);
 
@@ -103,6 +109,33 @@ public class UsuarioService {
     // credential, so it also works when the access token already expired.
     public void logout(RefreshRequestDTO dto) {
         refreshTokenService.revocar(dto.getRefreshToken());
+    }
+
+    // Soft delete with re-authentication: the JWT proves the session, the password
+    // proves the owner. Marks the account and kills every live session; data stays
+    // untouched during the grace period so logging back in restores everything.
+    @Transactional
+    public void eliminarCuenta(Usuario usuario, EliminarCuentaDTO dto) {
+        if (!passwordEncoder.matches(dto.getPassword(), usuario.getPasswordHash())) {
+            throw new CredencialesInvalidasException();
+        }
+        usuario.setEliminadoEn(LocalDateTime.now());
+        usuarioRepository.save(usuario);
+        refreshTokenService.revocarTodosDe(usuario.getId());
+    }
+
+    // A soft-deleted account inside the grace window is reactivated by the login
+    // itself (no extra endpoint); past the window it behaves as if it no longer
+    // existed — the purge job will remove it.
+    private void reactivarSiEnGracia(Usuario usuario) {
+        if (usuario.getEliminadoEn() == null) {
+            return;
+        }
+        if (usuario.getEliminadoEn().plusDays(DIAS_GRACIA_ELIMINACION).isBefore(LocalDateTime.now())) {
+            throw new UsuarioNoEncontradoException();
+        }
+        usuario.setEliminadoEn(null);
+        usuarioRepository.save(usuario);
     }
 
     @Transactional
