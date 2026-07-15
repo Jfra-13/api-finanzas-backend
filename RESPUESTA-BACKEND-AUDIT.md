@@ -1,5 +1,9 @@
 # Respuesta del backend a la auditoría de endpoints
 
+> **Documento histórico.** Los ítems marcados "Pendiente" (P1.3, P1.4, P1.5) quedaron
+> resueltos e implementados después de este intercambio: el contrato final vive en
+> `CONTRATOS-FINALES-BACKEND.md`.
+
 Respuesta punto por punto a `ENDPOINTS-AUDIT-DESDE_FRONT.md`. Cada ítem indica el estado real
 en la rama `feature/analytics-filtro-fechas` del backend y la decisión tomada.
 
