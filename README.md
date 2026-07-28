@@ -173,3 +173,7 @@ Rutas bajo `/api/v1`, en dos grupos: `usuarios` (cuenta, auth, OTP) y `finanzas`
 | Dispositivo físico no conecta | `10.0.2.2` no resuelve fuera del emulador | Apuntar el cliente a la IP LAN del host, misma red. |
 | 500 en vez de 401 con token vencido | — | Resuelto: el filtro JWT devuelve **401** ante token inválido/expirado. |
 | Consola H2 inaccesible en prod | Está deshabilitada a propósito | La consola H2 solo existe en el perfil dev. |
+
+## Licencia
+
+Distribuido bajo licencia MIT. Ver [`LICENSE`](LICENSE) para el texto completo.
