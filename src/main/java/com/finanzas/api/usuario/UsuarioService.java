@@ -174,6 +174,8 @@ public class UsuarioService {
     public void verificarOtp(VerifyOtpDTO dto) {
         Usuario usuario = buscarParaOtp(dto.getEmail());
         validarOtp(usuario, dto.getOtp());
+        // A correct code gives the attempt back so verify + reset don't burn the lock.
+        usuarioRepository.liberarIntentoOtp(usuario.getId());
     }
 
     // A wrong code must still commit the failed-attempt counter; rolling it back
@@ -238,17 +240,17 @@ public class UsuarioService {
             throw new OtpInvalidoException();
         }
 
-        if (usuario.getIntentosOtp() >= MAX_OTP_ATTEMPTS) {
-            throw new OtpBloqueadoException();
-        }
-
         if (usuario.getExpiracionOtp().isBefore(LocalDateTime.now())) {
             throw new OtpExpiradoException();
         }
 
+        // Every guess reserves an attempt before the comparison, so a parallel
+        // burst cannot get more than MAX_OTP_ATTEMPTS guesses past the lock.
+        if (usuarioRepository.reservarIntentoOtp(usuario.getId(), MAX_OTP_ATTEMPTS) == 0) {
+            throw new OtpBloqueadoException();
+        }
+
         if (!usuario.getCodigoOtp().equals(otp)) {
-            usuario.setIntentosOtp(usuario.getIntentosOtp() + 1);
-            usuarioRepository.save(usuario);
             throw new OtpInvalidoException();
         }
     }

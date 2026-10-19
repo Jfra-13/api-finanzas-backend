@@ -9,6 +9,13 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -29,6 +36,7 @@ class OtpBruteForceIntegrationTest extends IntegrationTestSupport {
 
     private static final String FORGOT = "/api/v1/usuarios/forgot-password";
     private static final String RESET = "/api/v1/usuarios/reset-password";
+    private static final String VERIFY = "/api/v1/usuarios/verify-otp";
     private static final String OTP = "1234";
 
     @MockitoBean private EmailService emailService;
@@ -57,6 +65,49 @@ class OtpBruteForceIntegrationTest extends IntegrationTestSupport {
                 .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.code").value("OTP_BLOQUEADO"));
         assertEquals(5, recargar().getIntentosOtp());
+    }
+
+    @Test
+    void resetPassword_intentosEnParalelo_noSuperanElLimite() throws Exception {
+        usuario = conOtp(LocalDateTime.now().plusMinutes(10), 0);
+        int hilos = 30;
+        CountDownLatch largada = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(hilos);
+        List<Future<Integer>> respuestas = new ArrayList<>();
+        for (int i = 0; i < hilos; i++) {
+            respuestas.add(pool.submit(() -> {
+                largada.await();
+                return mockMvc.perform(post(RESET).contentType(APPLICATION_JSON).content(reset("9999")))
+                        .andReturn().getResponse().getStatus();
+            }));
+        }
+        largada.countDown();
+
+        int comparados = 0;
+        for (Future<Integer> r : respuestas) {
+            if (r.get(30, TimeUnit.SECONDS) == 422) {
+                comparados++;
+            }
+        }
+        pool.shutdown();
+
+        // Each guess must reserve an attempt before the code is compared, so a
+        // parallel burst cannot get more than 5 guesses past the lock.
+        assertTrue(comparados <= 5, "guesses compared: " + comparados);
+        assertEquals(5, recargar().getIntentosOtp());
+    }
+
+    @Test
+    void verifyOtp_correcto_noConsumeIntento() throws Exception {
+        usuario = conOtp(LocalDateTime.now().plusMinutes(10), 4);
+
+        mockMvc.perform(post(VERIFY).contentType(APPLICATION_JSON).content(forgot().replace("}", ",\"otp\":\"" + OTP + "\"}")))
+                .andExpect(status().isOk());
+
+        // The legit flow (verify, then reset) must not burn the last attempt.
+        assertEquals(4, recargar().getIntentosOtp());
+        mockMvc.perform(post(RESET).contentType(APPLICATION_JSON).content(reset(OTP)))
+                .andExpect(status().isOk());
     }
 
     @Test
