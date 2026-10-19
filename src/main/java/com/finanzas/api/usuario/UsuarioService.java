@@ -188,6 +188,8 @@ public class UsuarioService {
         usuario.setExpiracionOtp(null);
         usuario.setIntentosOtp(0);
         usuarioRepository.save(usuario);
+        // New password ends every session opened with the old one.
+        refreshTokenService.revocarTodosDe(usuario.getId());
     }
 
     @Transactional
