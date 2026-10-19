@@ -18,6 +18,7 @@ import com.finanzas.api.security.UsuarioPrincipal;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,19 +42,22 @@ public class UsuarioService {
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
+    private final LoginIntentos loginIntentos;
 
     public UsuarioService(UsuarioRepository usuarioRepository,
                           PasswordEncoder passwordEncoder,
                           EmailService emailService,
                           AuthenticationManager authenticationManager,
                           JwtService jwtService,
-                          RefreshTokenService refreshTokenService) {
+                          RefreshTokenService refreshTokenService,
+                          LoginIntentos loginIntentos) {
         this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
         this.emailService = emailService;
         this.authenticationManager = authenticationManager;
         this.jwtService = jwtService;
         this.refreshTokenService = refreshTokenService;
+        this.loginIntentos = loginIntentos;
     }
 
     @Transactional
@@ -72,9 +76,17 @@ public class UsuarioService {
     }
 
     public LoginResponseDTO login(LoginDTO dto) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(dto.getEmail(), dto.getPassword())
-        );
+        loginIntentos.verificar(dto.getEmail());
+        Authentication authentication;
+        try {
+            authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(dto.getEmail(), dto.getPassword())
+            );
+        } catch (AuthenticationException e) {
+            loginIntentos.registrarFallo(dto.getEmail());
+            throw e;
+        }
+        loginIntentos.limpiar(dto.getEmail());
 
         UsuarioPrincipal userPrincipal = (UsuarioPrincipal) authentication.getPrincipal();
         Usuario usuario = userPrincipal.getUsuario();

@@ -108,7 +108,7 @@ Respuesta exitosa (`code: "LOGIN_SUCCESS"`):
 }
 ```
 
-Errores: `401 UNAUTHORIZED` con credenciales incorrectas.
+Errores: `401 UNAUTHORIZED` con credenciales incorrectas; `429 LOGIN_BLOQUEADO` tras 5 intentos fallidos en 15 minutos para ese email (rechaza incluso la password correcta hasta que vence la ventana; aplica igual a emails inexistentes).
 
 ### POST `/api/v1/usuarios/refresh`
 
@@ -480,4 +480,5 @@ Fuente de verdad de los códigos de error. El frontend ramifica **siempre por `c
 | 422 | `OTP_INVALIDO` | OTP incorrecto (o email inexistente) |
 | 422 | `OTP_EXPIRADO` | OTP vencido (>10 min) |
 | 429 | `OTP_BLOQUEADO` | Demasiados intentos OTP fallidos |
+| 429 | `LOGIN_BLOQUEADO` | Demasiados logins fallidos para ese email; reintentar en 15 minutos |
 | 500 | `INTERNAL_SERVER_ERROR` | Error no controlado |
