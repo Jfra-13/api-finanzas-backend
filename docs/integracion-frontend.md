@@ -476,6 +476,10 @@ Fuente de verdad de los códigos de error. El frontend ramifica **siempre por `c
 | 404 | `META_NO_ENCONTRADA` | No hay meta activa este período |
 | 404 | `CATEGORIA_NO_ENCONTRADA` | Categoría inexistente o no visible |
 | 404 | `PRESUPUESTO_NO_ENCONTRADO` | Presupuesto inexistente |
+| 404 | `NOT_FOUND` | Ruta inexistente |
+| 405 | `METHOD_NOT_ALLOWED` | Método HTTP no soportado por la ruta |
+| 415 | `UNSUPPORTED_MEDIA_TYPE` | `Content-Type` no soportado (usar `application/json`) |
+| 4xx | nombre del status HTTP | Otros errores de cliente detectados por el framework (p. ej. `BAD_REQUEST` por parámetro requerido faltante) |
 | 422 | `EMAIL_DUPLICADO` | Registro con correo ya existente |
 | 422 | `OTP_INVALIDO` | OTP incorrecto (o email inexistente) |
 | 422 | `OTP_EXPIRADO` | OTP vencido (>10 min) |

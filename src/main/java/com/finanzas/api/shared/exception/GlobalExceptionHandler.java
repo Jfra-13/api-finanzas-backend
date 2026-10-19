@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -120,6 +121,21 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponseDTO> handleGenericException(Exception ex, HttpServletRequest request) {
+        // Framework-detected client errors (unknown route, wrong method, wrong
+        // content type, missing param...) carry their own 4xx status: keep it
+        // instead of masking them as a 500.
+        if (ex instanceof ErrorResponse errorResponse && errorResponse.getStatusCode().is4xxClientError()) {
+            HttpStatus status = HttpStatus.valueOf(errorResponse.getStatusCode().value());
+            log.warn("Client error at {}: {}", request.getRequestURI(), ex.getMessage());
+            ErrorResponseDTO response = ErrorResponseDTO.builder()
+                    .timestamp(LocalDateTime.now())
+                    .status(status.value())
+                    .code(status.name())
+                    .message(status == HttpStatus.NOT_FOUND ? "Recurso no encontrado" : "Solicitud no válida para este recurso")
+                    .path(request.getRequestURI())
+                    .build();
+            return ResponseEntity.status(status).body(response);
+        }
         log.error("Unexpected error at {}: ", request.getRequestURI(), ex);
         ErrorResponseDTO response = ErrorResponseDTO.builder()
                 .timestamp(LocalDateTime.now())
