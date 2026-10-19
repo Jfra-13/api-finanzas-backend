@@ -2,35 +2,25 @@ package com.finanzas.api.security;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.stereotype.Component;
+import org.springframework.web.servlet.HandlerExceptionResolver;
 
-import java.io.IOException;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-
+// Hands filter-level auth failures to GlobalExceptionHandler, so a 401 uses the
+// same JSON envelope (serialized by Jackson) and generic message as any other error.
 @Component
 public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
+    private final HandlerExceptionResolver resolver;
+
+    public JwtAuthenticationEntryPoint(@Qualifier("handlerExceptionResolver") HandlerExceptionResolver resolver) {
+        this.resolver = resolver;
+    }
+
     @Override
-    public void commence(HttpServletRequest request, HttpServletResponse response, AuthenticationException authException) 
-            throws IOException {
-        
-        response.setStatus(HttpStatus.UNAUTHORIZED.value());
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-
-        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME);
-        String path = request.getRequestURI();
-        String message = "No autorizado: " + authException.getMessage();
-        
-        String jsonResponse = String.format(
-            "{\"timestamp\":\"%s\", \"status\":401, \"code\":\"UNAUTHORIZED\", \"message\":\"%s\", \"path\":\"%s\"}",
-            timestamp, message, path
-        );
-
-        response.getWriter().write(jsonResponse);
+    public void commence(HttpServletRequest request, HttpServletResponse response, AuthenticationException authException) {
+        resolver.resolveException(request, response, null, authException);
     }
 }
