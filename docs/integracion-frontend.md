@@ -127,7 +127,7 @@ Errores: `401 REFRESH_TOKEN_INVALIDO` (inexistente, expirado o ya usado).
 
 Request: `{ "email": "juan@correo.com" }`
 
-Siempre responde `200` con `code: "OTP_SENT"` exista o no el correo (anti-enumeración). Si existe, envía por email un OTP de 4 dígitos válido por 10 minutos.
+Siempre responde `200` con `code: "OTP_SENT"` exista o no el correo (anti-enumeración). Si existe, envía por email un OTP de 4 dígitos válido por 10 minutos. Mientras haya un código vigente, un nuevo pedido no genera ni reenvía otro (sigue respondiendo `200 OTP_SENT`).
 
 ### POST `/api/v1/usuarios/verify-otp`
 

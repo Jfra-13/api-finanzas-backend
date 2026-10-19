@@ -141,9 +141,15 @@ public class UsuarioService {
         return true;
     }
 
+    // One live OTP per account: while a code is still valid, a new request is
+    // silently ignored. Re-issuing would reset the attempt counter and turn the
+    // 5-attempt lock into an unlimited brute force (and spam the inbox).
     @Transactional
     public void generarOtpRecuperacion(ForgotPasswordDTO dto) {
         usuarioRepository.findByEmail(dto.getEmail()).ifPresent(usuario -> {
+            if (usuario.getExpiracionOtp() != null && usuario.getExpiracionOtp().isAfter(LocalDateTime.now())) {
+                return;
+            }
             String otp = String.format("%04d", SECURE_RANDOM.nextInt(10000));
             usuario.setCodigoOtp(otp);
             usuario.setExpiracionOtp(LocalDateTime.now().plusMinutes(10));
@@ -158,7 +164,9 @@ public class UsuarioService {
         validarOtp(usuario, dto.getOtp());
     }
 
-    @Transactional
+    // A wrong code must still commit the failed-attempt counter; rolling it back
+    // would disable the lockout for this endpoint.
+    @Transactional(noRollbackFor = OtpInvalidoException.class)
     public void resetPassword(ResetPasswordDTO dto) {
         Usuario usuario = buscarParaOtp(dto.getEmail());
         validarOtp(usuario, dto.getOtp());
