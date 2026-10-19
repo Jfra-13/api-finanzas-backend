@@ -72,6 +72,9 @@ public class TransaccionService {
     // Daily profit quota driven by net profit. When meta/dias are null they are
     // resolved from the active Meta in the DB (goal amount + remaining working days).
     public BigDecimal obtenerCuotaDiaria(Long usuarioId, BigDecimal metaMensual, Integer diasRestantes) {
+        if (diasRestantes != null) {
+            ParametroInvalidoException.enRango("dias", diasRestantes, 0, 31);
+        }
         Optional<Meta> metaActiva = (metaMensual == null || diasRestantes == null)
                 ? metaService.obtenerMetaActual(usuarioId)
                 : Optional.empty();

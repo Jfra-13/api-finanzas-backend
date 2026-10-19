@@ -263,7 +263,7 @@ Cuánto debe ganar por día (en **utilidad neta**) para alcanzar la meta mensual
 | Query param | Tipo | Descripción |
 |---|---|---|
 | `meta` | decimal (opcional) | Meta mensual de utilidad |
-| `dias` | entero (opcional) | Días restantes |
+| `dias` | entero (opcional) | Días restantes, rango `0`-`31` |
 
 **Sin parámetros**, lee la meta y los días laborables restantes de la **meta persistida** del usuario (ver `POST /metas`). Pasar `meta`/`dias` los sobrescribe para el cálculo.
 
@@ -408,7 +408,7 @@ Ingresos/egresos totales de los últimos N meses (para gráfico de líneas). Arr
 
 | Query param | Tipo | Descripción |
 |---|---|---|
-| `meses` | entero (opcional) | Ventana de meses (default `6`) |
+| `meses` | entero (opcional) | Ventana de meses (default `6`, rango `1`-`24`) |
 
 Respuesta (`code: "MONTHLY_TREND_OK"`):
 ```json
@@ -466,7 +466,7 @@ Fuente de verdad de los códigos de error. El frontend ramifica **siempre por `c
 | 400 | `VALIDATION_ERROR` | Falla de validación de campos (trae `details[]`) |
 | 400 | `MALFORMED_JSON` | Body JSON mal formado |
 | 400 | `RANGO_FECHAS_INVALIDO` | `desde > hasta`, o fecha (`desde`/`hasta`) mal formada |
-| 400 | `PARAMETRO_INVALIDO` | Query param con tipo/formato inválido (que no sea fecha) |
+| 400 | `PARAMETRO_INVALIDO` | Query param con tipo/formato inválido (que no sea fecha) o fuera de rango: `meses` 1-24 (tendencia-mensual, metas/historial), `ventana` 1-24 con MES y 1-52 con SEMANA (tendencia), `ventana` 1-52 (ingresos-por-dia-semana), `dias` 0-31 (cuota-diaria, progreso-metas) |
 | 401 | `UNAUTHORIZED` | Sin token, token inválido/expirado, o credenciales incorrectas en login |
 | 401 | `REFRESH_TOKEN_INVALIDO` | Refresh token inexistente, expirado o ya usado (rotado) |
 | 401 | `CREDENCIALES_INVALIDAS` | Credenciales inválidas (variante explícita) |

@@ -204,7 +204,7 @@ public class AnaliticaService {
 
     // B. Line chart: income/expense totals for the last N months, oldest first.
     public TendenciaMensualDTO tendenciaMensual(Long usuarioId, int meses) {
-        int ventana = Math.max(1, meses);
+        int ventana = ParametroInvalidoException.enRango("meses", meses, 1, 24);
         List<String> etiquetas = new ArrayList<>();
         List<BigDecimal> ingresos = new ArrayList<>();
         List<BigDecimal> egresos = new ArrayList<>();
@@ -254,7 +254,7 @@ public class AnaliticaService {
     // starts it (yyyy-MM-dd). Oldest bucket first, current period always last.
     public TendenciaDTO tendencia(Long usuarioId, String granularidad, Integer ventana) {
         String gran = granularidad == null ? "MES" : granularidad.toUpperCase();
-        int n = Math.max(1, ventana != null ? ventana : 6);
+        int n = ParametroInvalidoException.enRango("ventana", ventana != null ? ventana : 6, 1, "MES".equals(gran) ? 24 : 52);
 
         if ("MES".equals(gran)) {
             TendenciaMensualDTO mensual = tendenciaMensual(usuarioId, n);
@@ -284,7 +284,7 @@ public class AnaliticaService {
     // F. Income per weekday aggregated over the last N weeks (current week included).
     // Always 7 items, Monday first — same positional contract as resumen-semanal.
     public List<DiaSemanaIngresoDTO> ingresosPorDiaSemana(Long usuarioId, Integer ventana) {
-        int semanas = Math.max(1, ventana != null ? ventana : 4);
+        int semanas = ParametroInvalidoException.enRango("ventana", ventana != null ? ventana : 4, 1, 52);
 
         LocalDate lunesActual = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
         LocalDateTime inicio = lunesActual.minusWeeks(semanas - 1).atStartOfDay();
