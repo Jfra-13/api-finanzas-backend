@@ -1,6 +1,5 @@
 package com.finanzas.api.transaccion;
 
-import com.finanzas.api.shared.exception.specific.AccesoDenegadoException;
 import com.finanzas.api.shared.exception.specific.CategoriaNoEncontradaException;
 import com.finanzas.api.shared.exception.specific.PresupuestoNoEncontradoException;
 import com.finanzas.api.transaccion.dto.PresupuestoRegistroDTO;
@@ -59,11 +58,10 @@ public class PresupuestoService {
 
     @Transactional
     public void eliminar(Long usuarioId, Long id) {
+        // Another user's budget is reported as missing (404) so ids cannot be probed.
         Presupuesto presupuesto = presupuestoRepository.findById(id)
+                .filter(p -> p.getUsuario().getId().equals(usuarioId))
                 .orElseThrow(PresupuestoNoEncontradoException::new);
-        if (!presupuesto.getUsuario().getId().equals(usuarioId)) {
-            throw new AccesoDenegadoException();
-        }
         presupuestoRepository.delete(presupuesto);
     }
 

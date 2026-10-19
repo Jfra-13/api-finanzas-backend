@@ -242,13 +242,13 @@ Actualiza una transacción propia. Mismo body que el registro **más** el campo 
 
 `categoriaId: null` quita la categoría del movimiento. Respuesta (`code: "TRANSACTION_UPDATED"`) devuelve la transacción actualizada (mismo shape que un item del historial).
 
-Errores: `404 TRANSACCION_NO_ENCONTRADA`, `403 ACCESO_DENEGADO` (la transacción es de otro usuario), `404 CATEGORIA_NO_ENCONTRADA`.
+Errores: `404 TRANSACCION_NO_ENCONTRADA` (inexistente **o de otro usuario**, sin distinción), `404 CATEGORIA_NO_ENCONTRADA`.
 
 ### DELETE `/api/v1/finanzas/transacciones/{id}`
 
 Elimina una transacción propia. Respuesta: `code: "TRANSACTION_DELETED"`, `data: null`.
 
-Errores: `404 TRANSACCION_NO_ENCONTRADA`, `403 ACCESO_DENEGADO`.
+Errores: `404 TRANSACCION_NO_ENCONTRADA` (inexistente o de otro usuario).
 
 ### GET `/api/v1/finanzas/hoy`
 
@@ -470,7 +470,7 @@ Fuente de verdad de los códigos de error. El frontend ramifica **siempre por `c
 | 401 | `UNAUTHORIZED` | Sin token, token inválido/expirado, o credenciales incorrectas en login |
 | 401 | `REFRESH_TOKEN_INVALIDO` | Refresh token inexistente, expirado o ya usado (rotado) |
 | 401 | `CREDENCIALES_INVALIDAS` | Credenciales inválidas (variante explícita) |
-| 403 | `FORBIDDEN` / `ACCESO_DENEGADO` | Sin permisos / el recurso es de otro usuario |
+| 403 | `FORBIDDEN` / `ACCESO_DENEGADO` | Sin permisos (p. ej. editar o eliminar una categoría base). Un recurso de otro usuario responde 404, como si no existiera |
 | 404 | `USUARIO_NO_ENCONTRADO` | Usuario inexistente |
 | 404 | `TRANSACCION_NO_ENCONTRADA` | Transacción inexistente |
 | 404 | `META_NO_ENCONTRADA` | No hay meta activa este período |
