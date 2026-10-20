@@ -76,14 +76,19 @@ Anticipa, no sólo describe. Spec: sección 4 del doc técnico.
 ## – Fase 5 — Señales de salud ampliadas
 
 Amplía el catálogo de `salud-financiera` y agrega `severidad`, retrocompatible. Spec: sección 5.
-**En progreso** (`AnaliticaService` / `AlertaDTO` con cambios sin commitear).
+**En progreso.** Lo implementado ya está commiteado en `AnaliticaService` / `AlertaDTO`.
 
-- [ ] Campo `severidad` (`ALTA` | `MEDIA` | `BAJA`) + `categoriaId` opcional
-- [ ] Nuevos `code`: `TASA_AHORRO_BAJA`, `EGRESOS_SUPERAN_INGRESOS`, `PICO_CATEGORIA`,
-      `PRESUPUESTO_EXCEDIDO`, `PROYECCION_BAJO_META`, `INGRESO_VOLATIL`, `RACHA_POSITIVA`,
-      `TASA_AHORRO_SANA`
-- [ ] Cada `code` con su regla exacta documentada
-- [ ] Retrocompatibilidad: los 3 códigos actuales siguen
+- [x] Campo `severidad` (`ALTA` | `MEDIA` | `BAJA`) + `categoriaId` opcional
+- [x] Nuevos `code` implementados: `EGRESOS_SUPERAN_INGRESOS`, `TASA_AHORRO_BAJA`,
+      `TASA_AHORRO_SANA`, `PRESUPUESTO_EXCEDIDO`, `PROYECCION_BAJO_META`
+- [ ] Nuevos `code` pendientes: `PICO_CATEGORIA`, `INGRESO_VOLATIL`, `RACHA_POSITIVA`
+- [ ] Cada `code` con su regla exacta documentada: los 5 implementados coinciden con la
+      sección 5 del doc técnico; los 3 pendientes todavía no tienen umbral exacto
+      ("alta dispersión", "N días")
+- [ ] Tests: solo `EGRESOS_SUPERAN_INGRESOS` tiene test de integración; faltan
+      `TASA_AHORRO_BAJA`, `TASA_AHORRO_SANA`, `PRESUPUESTO_EXCEDIDO`, `PROYECCION_BAJO_META`
+      y `severidad`
+- [x] Retrocompatibilidad: los 3 códigos actuales siguen
 
 ## Fase 6 — Endpoint de recomendaciones
 
