@@ -117,6 +117,9 @@ Capa accionable final. Reúne 2, 3 y 4 en consejos priorizados. Spec: sección 6
 
 ## Pendientes reales
 
+- **Seguridad:** estado de la auditoría, fixes y pendientes en
+  [`seguridad-estado.md`](seguridad-estado.md).
+
 - **Rotación de credenciales (#8):** sacar los secretos del repo (ya hecho) no es lo mismo que
   rotarlos. Gmail app password, `jwt.secret` y password de BD siguen siendo los históricamente
   filtrados. Acción operativa fuera del código.
