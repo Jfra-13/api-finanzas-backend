@@ -127,13 +127,13 @@ Errores: `401 REFRESH_TOKEN_INVALIDO` (inexistente, expirado o ya usado).
 
 Request: `{ "email": "juan@correo.com" }`
 
-Siempre responde `200` con `code: "OTP_SENT"` exista o no el correo (anti-enumeración). Si existe, envía por email un OTP de 4 dígitos válido por 10 minutos. Mientras haya un código vigente, un nuevo pedido no genera ni reenvía otro (sigue respondiendo `200 OTP_SENT`).
+Siempre responde `200` con `code: "OTP_SENT"` exista o no el correo (anti-enumeración). Si existe, envía por email un OTP de 6 dígitos válido por 10 minutos. Mientras haya un código vigente, un nuevo pedido no genera ni reenvía otro (sigue respondiendo `200 OTP_SENT`).
 
 ### POST `/api/v1/usuarios/verify-otp`
 
-Request: `{ "email": "juan@correo.com", "otp": "1234" }`
+Request: `{ "email": "juan@correo.com", "otp": "123456" }`
 
-`otp`: exactamente 4 dígitos. Respuesta exitosa: `code: "OTP_VERIFIED"`. Este paso es opcional para UX (no consume el código).
+`otp`: exactamente 6 dígitos. Respuesta exitosa: `code: "OTP_VERIFIED"`. Este paso es opcional para UX (no consume el código).
 
 Errores: `422 OTP_INVALIDO` (código incorrecto **o email inexistente**, sin distinción), `422 OTP_EXPIRADO`, `429 OTP_BLOQUEADO` (tras 5 intentos fallidos).
 
@@ -141,7 +141,7 @@ Errores: `422 OTP_INVALIDO` (código incorrecto **o email inexistente**, sin dis
 
 Request:
 ```json
-{ "email": "juan@correo.com", "otp": "1234", "newPassword": "nueva1234" }
+{ "email": "juan@correo.com", "otp": "123456", "newPassword": "nueva1234" }
 ```
 
 `newPassword`: mínimo 8 caracteres. Vuelve a validar el OTP. Respuesta exitosa: `code: "PASSWORD_RESET_SUCCESS"`.

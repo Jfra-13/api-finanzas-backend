@@ -110,12 +110,12 @@ class RefreshTokenIntegrationTest extends IntegrationTestSupport {
         registrar("rt6@test.com");
         String refresh = refreshTokenDeLogin("rt6@test.com");
         Usuario usuario = usuarioRepository.findByEmail("rt6@test.com").orElseThrow();
-        usuario.setCodigoOtp("1234");
+        usuario.setCodigoOtp("123456");
         usuario.setExpiracionOtp(LocalDateTime.now().plusMinutes(10));
         usuario.setIntentosOtp(0);
         usuarioRepository.save(usuario);
 
-        String reset = "{\"email\":\"rt6@test.com\",\"otp\":\"1234\",\"newPassword\":\"NuevaPass123\"}";
+        String reset = "{\"email\":\"rt6@test.com\",\"otp\":\"123456\",\"newPassword\":\"NuevaPass123\"}";
         mockMvc.perform(post(RESET).contentType(APPLICATION_JSON).content(reset))
                 .andExpect(status().isOk());
 

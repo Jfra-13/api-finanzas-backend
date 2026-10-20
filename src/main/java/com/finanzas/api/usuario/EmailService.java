@@ -22,7 +22,7 @@ public class EmailService {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(email);
         message.setSubject("Código de Recuperación");
-        message.setText("Tu código de verificación de 4 dígitos es: " + otp + "\n\nEste código expirará en 10 minutos.");
+        message.setText("Tu código de verificación de 6 dígitos es: " + otp + "\n\nEste código expirará en 10 minutos.");
         mailSender.send(message);
     }
 }

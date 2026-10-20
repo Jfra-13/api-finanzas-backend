@@ -12,6 +12,6 @@ public class VerifyOtpDTO {
     private String email;
 
     @NotBlank(message = "{otp.notblank}")
-    @Pattern(regexp = "^\\d{4}$", message = "{otp.pattern}")
+    @Pattern(regexp = "^\\d{6}$", message = "{otp.pattern}")
     private String otp;
 }

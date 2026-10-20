@@ -155,7 +155,7 @@ public class UsuarioService {
             if (usuario.getExpiracionOtp() != null && usuario.getExpiracionOtp().isAfter(LocalDateTime.now())) {
                 return;
             }
-            String otp = String.format("%04d", SECURE_RANDOM.nextInt(10000));
+            String otp = String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
             usuario.setCodigoOtp(otp);
             usuario.setExpiracionOtp(LocalDateTime.now().plusMinutes(10));
             usuario.setIntentosOtp(0);

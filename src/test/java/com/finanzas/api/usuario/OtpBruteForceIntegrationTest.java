@@ -37,7 +37,8 @@ class OtpBruteForceIntegrationTest extends IntegrationTestSupport {
     private static final String FORGOT = "/api/v1/usuarios/forgot-password";
     private static final String RESET = "/api/v1/usuarios/reset-password";
     private static final String VERIFY = "/api/v1/usuarios/verify-otp";
-    private static final String OTP = "1234";
+    private static final String OTP = "123456";
+    private static final String OTP_INCORRECTO = "999999";
 
     @MockitoBean private EmailService emailService;
 
@@ -55,7 +56,7 @@ class OtpBruteForceIntegrationTest extends IntegrationTestSupport {
         usuario = conOtp(LocalDateTime.now().plusMinutes(10), 0);
 
         for (int i = 0; i < 5; i++) {
-            mockMvc.perform(post(RESET).contentType(APPLICATION_JSON).content(reset("9999")))
+            mockMvc.perform(post(RESET).contentType(APPLICATION_JSON).content(reset(OTP_INCORRECTO)))
                     .andExpect(status().isUnprocessableEntity())
                     .andExpect(jsonPath("$.code").value("OTP_INVALIDO"));
         }
@@ -77,7 +78,7 @@ class OtpBruteForceIntegrationTest extends IntegrationTestSupport {
         for (int i = 0; i < hilos; i++) {
             respuestas.add(pool.submit(() -> {
                 largada.await();
-                return mockMvc.perform(post(RESET).contentType(APPLICATION_JSON).content(reset("9999")))
+                return mockMvc.perform(post(RESET).contentType(APPLICATION_JSON).content(reset(OTP_INCORRECTO)))
                         .andReturn().getResponse().getStatus();
             }));
         }
@@ -134,7 +135,20 @@ class OtpBruteForceIntegrationTest extends IntegrationTestSupport {
         Usuario recargado = recargar();
         assertEquals(0, recargado.getIntentosOtp());
         assertTrue(recargado.getExpiracionOtp().isAfter(LocalDateTime.now()));
+        assertTrue(recargado.getCodigoOtp().matches("\\d{6}"), "otp: " + recargado.getCodigoOtp());
         verify(emailService).enviarOtp(eq(usuario.getEmail()), eq(recargado.getCodigoOtp()));
+    }
+
+    @Test
+    void otpDeCuatroDigitos_esRechazadoSinConsumirIntento() throws Exception {
+        usuario = conOtp(LocalDateTime.now().plusMinutes(10), 0);
+
+        mockMvc.perform(post(RESET).contentType(APPLICATION_JSON).content(reset("1234")))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post(VERIFY).contentType(APPLICATION_JSON).content(forgot().replace("}", ",\"otp\":\"1234\"}")))
+                .andExpect(status().isBadRequest());
+
+        assertEquals(0, recargar().getIntentosOtp());
     }
 
     private Usuario conOtp(LocalDateTime expiracion, int intentos) {
