@@ -4,6 +4,16 @@ import com.finanzas.api.support.IntegrationTestSupport;
 import com.finanzas.api.usuario.model.Usuario;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
@@ -14,6 +24,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 // Covers the user account flow end to end through the real security/JPA stack:
 // registration (incl. tipoNegocio persistence) and login (success + bad creds).
@@ -55,6 +66,39 @@ class UsuarioFlowIntegrationTest extends IntegrationTestSupport {
         assertEquals("Juana", guardado.getNombre());
         assertEquals("TAXI", guardado.getTipoNegocio());
         verify(emailService).avisarRegistroConEmailExistente("dup@test.com");
+    }
+
+    // Parallel sign-ups with the same new email all pass the existence check;
+    // the UNIQUE constraint rejects the losers, which must still get the normal
+    // answer (no 500, no enumeration). The requests commit on their own threads,
+    // so this test runs outside the rolled-back test transaction and cleans up.
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void registro_mismoEmailEnParalelo_respondeIgualYCreaUnoSolo() throws Exception {
+        String email = "race@test.com";
+        String body = "{\"nombre\":\"Race\",\"email\":\"" + email + "\",\"password\":\"Password123\",\"tipoNegocio\":\"TAXI\"}";
+        int hilos = 10;
+        CountDownLatch largada = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(hilos);
+        try {
+            List<Future<Integer>> respuestas = new ArrayList<>();
+            for (int i = 0; i < hilos; i++) {
+                respuestas.add(pool.submit(() -> {
+                    largada.await();
+                    return mockMvc.perform(post(REGISTRO).contentType(APPLICATION_JSON).content(body))
+                            .andReturn().getResponse().getStatus();
+                }));
+            }
+            largada.countDown();
+
+            for (Future<Integer> r : respuestas) {
+                assertEquals(200, r.get(30, TimeUnit.SECONDS));
+            }
+            assertTrue(usuarioRepository.findByEmail(email).isPresent());
+        } finally {
+            pool.shutdown();
+            usuarioRepository.findByEmail(email).ifPresent(usuarioRepository::delete);
+        }
     }
 
     @Test

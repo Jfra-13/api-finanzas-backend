@@ -15,6 +15,7 @@ import com.finanzas.api.usuario.dto.VerifyOtpDTO;
 import com.finanzas.api.usuario.model.Usuario;
 import com.finanzas.api.security.JwtService;
 import com.finanzas.api.security.UsuarioPrincipal;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -62,7 +63,9 @@ public class UsuarioService {
     // An existing email gets the same response as a new one (no account
     // enumeration); its owner is told by mail instead. The hash runs on both
     // paths so response time does not give the email away either.
-    @Transactional
+    // Not @Transactional on purpose: a parallel sign-up can win the race to the
+    // UNIQUE email, and catching that inside a shared transaction would still
+    // fail at commit (rollback-only). The single save runs in its own transaction.
     public void registrarUsuario(UsuarioRegistroDTO dto) {
         String passwordHash = passwordEncoder.encode(dto.getPassword());
         if (usuarioRepository.findByEmail(dto.getEmail()).isPresent()) {
@@ -76,7 +79,14 @@ public class UsuarioService {
         nuevoUsuario.setPasswordHash(passwordHash);
         nuevoUsuario.setTipoNegocio(dto.getTipoNegocio());
 
-        usuarioRepository.save(nuevoUsuario);
+        try {
+            usuarioRepository.save(nuevoUsuario);
+        } catch (DataIntegrityViolationException e) {
+            if (usuarioRepository.findByEmail(dto.getEmail()).isEmpty()) {
+                throw e;
+            }
+            emailService.avisarRegistroConEmailExistente(dto.getEmail());
+        }
     }
 
     public LoginResponseDTO login(LoginDTO dto) {
