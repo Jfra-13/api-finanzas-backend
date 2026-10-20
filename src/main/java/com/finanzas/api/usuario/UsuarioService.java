@@ -18,7 +18,6 @@ import com.finanzas.api.security.UsuarioPrincipal;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -76,16 +75,10 @@ public class UsuarioService {
     }
 
     public LoginResponseDTO login(LoginDTO dto) {
-        loginIntentos.verificar(dto.getEmail());
-        Authentication authentication;
-        try {
-            authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(dto.getEmail(), dto.getPassword())
-            );
-        } catch (AuthenticationException e) {
-            loginIntentos.registrarFallo(dto.getEmail());
-            throw e;
-        }
+        loginIntentos.reservar(dto.getEmail());
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(dto.getEmail(), dto.getPassword())
+        );
         loginIntentos.limpiar(dto.getEmail());
 
         UsuarioPrincipal userPrincipal = (UsuarioPrincipal) authentication.getPrincipal();

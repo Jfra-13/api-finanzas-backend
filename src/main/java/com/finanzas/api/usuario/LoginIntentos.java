@@ -11,32 +11,30 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
-// Login brute-force guard: after MAX_FALLOS failed logins for an email within
-// VENTANA, that email is locked until the window ends. Keyed by the submitted
-// email (known or not), so a lock never reveals whether an account exists.
+// Login brute-force guard: after MAX_INTENTOS unsuccessful logins for an email
+// within VENTANA, that email is locked until the window ends. Keyed by the
+// submitted email (known or not), so a lock never reveals whether an account exists.
 // ponytail: in-memory, per instance and reset on restart; move to a shared
 // store (DB/Redis) once the app runs on more than one instance.
 @Component
 public class LoginIntentos {
 
-    static final int MAX_FALLOS = 5;
+    static final int MAX_INTENTOS = 5;
     static final Duration VENTANA = Duration.ofMinutes(15);
 
-    private record Registro(int fallos, Instant inicio) {}
+    private record Registro(int intentos, Instant inicio) {}
 
     private final Map<String, Registro> registros = new ConcurrentHashMap<>();
 
-    public void verificar(String email) {
-        Registro registro = registros.get(clave(email));
-        if (registro != null && registro.fallos() >= MAX_FALLOS && !vencido(registro)) {
+    // Counts the attempt atomically BEFORE the (slow) password check, so a
+    // parallel burst cannot slip past the limit; a success clears it via limpiar.
+    public void reservar(String email) {
+        Registro registro = registros.compute(clave(email), (k, r) -> r == null || vencido(r)
+                ? new Registro(1, Instant.now())
+                : new Registro(r.intentos() + 1, r.inicio()));
+        if (registro.intentos() > MAX_INTENTOS) {
             throw new LoginBloqueadoException();
         }
-    }
-
-    public void registrarFallo(String email) {
-        registros.compute(clave(email), (k, r) -> r == null || vencido(r)
-                ? new Registro(1, Instant.now())
-                : new Registro(r.fallos() + 1, r.inicio()));
     }
 
     public void limpiar(String email) {

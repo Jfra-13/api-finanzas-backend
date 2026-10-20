@@ -3,6 +3,15 @@ package com.finanzas.api.usuario;
 import com.finanzas.api.support.IntegrationTestSupport;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -48,6 +57,35 @@ class LoginBruteForceIntegrationTest extends IntegrationTestSupport {
         mockMvc.perform(post(LOGIN).contentType(APPLICATION_JSON).content(login(email, PASSWORD)))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.code").value("LOGIN_BLOQUEADO"));
+    }
+
+    @Test
+    void login_intentosEnParalelo_noSuperanElLimite() throws Exception {
+        String email = "burst-lock@test.com";
+        int hilos = 30;
+        CountDownLatch largada = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(hilos);
+        List<Future<Integer>> respuestas = new ArrayList<>();
+        for (int i = 0; i < hilos; i++) {
+            respuestas.add(pool.submit(() -> {
+                largada.await();
+                return mockMvc.perform(post(LOGIN).contentType(APPLICATION_JSON).content(login(email, "WrongPass123")))
+                        .andReturn().getResponse().getStatus();
+            }));
+        }
+        largada.countDown();
+
+        int autenticados = 0;
+        for (Future<Integer> r : respuestas) {
+            if (r.get(30, TimeUnit.SECONDS) == 401) {
+                autenticados++;
+            }
+        }
+        pool.shutdown();
+
+        // The attempt is reserved before the (slow) password check, so a parallel
+        // burst cannot get more than 5 password checks past the lock.
+        assertTrue(autenticados <= 5, "password checks: " + autenticados);
     }
 
     private String registrar(String email) throws Exception {
