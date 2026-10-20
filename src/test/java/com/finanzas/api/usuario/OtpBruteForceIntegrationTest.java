@@ -64,7 +64,11 @@ class OtpBruteForceIntegrationTest extends IntegrationTestSupport {
         // Even the right code is refused once the attempts are exhausted.
         mockMvc.perform(post(RESET).contentType(APPLICATION_JSON).content(reset(OTP)))
                 .andExpect(status().isTooManyRequests())
-                .andExpect(jsonPath("$.code").value("OTP_BLOQUEADO"));
+                .andExpect(jsonPath("$.code").value("OTP_BLOQUEADO"))
+                // A new request is ignored while this code is live, so "request a new
+                // code" alone would send the user into a silent 200 with no email.
+                .andExpect(jsonPath("$.message").value(
+                        "Demasiados intentos fallidos. Espera unos minutos y solicita un nuevo código."));
         assertEquals(5, recargar().getIntentosOtp());
     }
 
