@@ -35,6 +35,16 @@ springdoc.api-docs.enabled=false
 springdoc.swagger-ui.enabled=false
 
 # ------------------------------------------
+# CLIENT IP behind the Azure proxy
+# The per-IP auth rate limit (RateLimitPorIp, 20 req/min) keys on getRemoteAddr().
+# Without this every request carries the proxy IP and the limit throttles all users.
+# Tomcat's RemoteIpValve only trusts X-Forwarded-For from private ranges by default.
+# DEPLOY CHECK: confirm in Azure that getRemoteAddr() is the real client IP
+# (not the proxy, and not "ip:port"); otherwise set server.tomcat.remoteip.internal-proxies.
+# ------------------------------------------
+server.forward-headers-strategy=native
+
+# ------------------------------------------
 # REQUIRED ENVIRONMENT VARIABLES (prod)
 #   DB_HOST        Azure PostgreSQL host (e.g. my-server.postgres.database.azure.com)
 #   DB_NAME        database name

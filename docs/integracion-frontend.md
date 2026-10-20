@@ -484,4 +484,5 @@ Fuente de verdad de los códigos de error. El frontend ramifica **siempre por `c
 | 422 | `OTP_EXPIRADO` | OTP vencido (>10 min) |
 | 429 | `OTP_BLOQUEADO` | Demasiados intentos OTP fallidos |
 | 429 | `LOGIN_BLOQUEADO` | Demasiados logins fallidos para ese email; reintentar en 15 minutos |
+| 429 | `RATE_LIMIT_EXCEDIDO` | Más de 20 solicitudes por minuto desde la misma IP sumando registro, login, forgot-password, verify-otp y reset-password; reintentar en un minuto |
 | 500 | `INTERNAL_SERVER_ERROR` | Error no controlado |

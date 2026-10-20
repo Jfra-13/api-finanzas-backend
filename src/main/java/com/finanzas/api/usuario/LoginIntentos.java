@@ -14,6 +14,8 @@ import java.util.concurrent.TimeUnit;
 // Login brute-force guard: after MAX_INTENTOS unsuccessful logins for an email
 // within VENTANA, that email is locked until the window ends. Keyed by the
 // submitted email (known or not), so a lock never reveals whether an account exists.
+// Accepted risk: anyone can lock a victim's login for VENTANA by failing on purpose;
+// RateLimitPorIp caps how fast a single IP can do it.
 // ponytail: in-memory, per instance and reset on restart; move to a shared
 // store (DB/Redis) once the app runs on more than one instance.
 @Component
