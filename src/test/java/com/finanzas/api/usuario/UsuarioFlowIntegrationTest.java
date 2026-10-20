@@ -3,7 +3,11 @@ package com.finanzas.api.usuario;
 import com.finanzas.api.support.IntegrationTestSupport;
 import com.finanzas.api.usuario.model.Usuario;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -17,6 +21,8 @@ class UsuarioFlowIntegrationTest extends IntegrationTestSupport {
 
     private static final String REGISTRO = "/api/v1/usuarios/registro";
     private static final String LOGIN = "/api/v1/usuarios/login";
+
+    @MockitoBean private EmailService emailService;
 
     @Test
     void registro_ok_persisteUsuarioConTipoNegocio() throws Exception {
@@ -32,13 +38,23 @@ class UsuarioFlowIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
-    void registro_emailDuplicado_devuelve422() throws Exception {
-        String body = "{\"nombre\":\"Juana\",\"email\":\"dup@test.com\",\"password\":\"Password123\",\"tipoNegocio\":\"TAXI\"}";
-        mockMvc.perform(post(REGISTRO).contentType(APPLICATION_JSON).content(body)).andExpect(status().isOk());
+    void registro_emailExistente_respondeIgualSinTocarLaCuentaYAvisaAlDueno() throws Exception {
+        String original = "{\"nombre\":\"Juana\",\"email\":\"dup@test.com\",\"password\":\"Password123\",\"tipoNegocio\":\"TAXI\"}";
+        mockMvc.perform(post(REGISTRO).contentType(APPLICATION_JSON).content(original)).andExpect(status().isOk());
+        String hashOriginal = usuarioRepository.findByEmail("dup@test.com").orElseThrow().getPasswordHash();
+        verify(emailService, never()).avisarRegistroConEmailExistente(anyString());
 
-        mockMvc.perform(post(REGISTRO).contentType(APPLICATION_JSON).content(body))
-                .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.code").value("EMAIL_DUPLICADO"));
+        // Same answer as a fresh sign-up, so the endpoint cannot be used to find accounts.
+        String intruso = "{\"nombre\":\"Otro\",\"email\":\"dup@test.com\",\"password\":\"OtraPass123\",\"tipoNegocio\":\"BODEGA\"}";
+        mockMvc.perform(post(REGISTRO).contentType(APPLICATION_JSON).content(intruso))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("USER_REGISTERED"));
+
+        Usuario guardado = usuarioRepository.findByEmail("dup@test.com").orElseThrow();
+        assertEquals(hashOriginal, guardado.getPasswordHash());
+        assertEquals("Juana", guardado.getNombre());
+        assertEquals("TAXI", guardado.getTipoNegocio());
+        verify(emailService).avisarRegistroConEmailExistente("dup@test.com");
     }
 
     @Test

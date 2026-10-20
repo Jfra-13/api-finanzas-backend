@@ -59,16 +59,21 @@ public class UsuarioService {
         this.loginIntentos = loginIntentos;
     }
 
+    // An existing email gets the same response as a new one (no account
+    // enumeration); its owner is told by mail instead. The hash runs on both
+    // paths so response time does not give the email away either.
     @Transactional
     public void registrarUsuario(UsuarioRegistroDTO dto) {
+        String passwordHash = passwordEncoder.encode(dto.getPassword());
         if (usuarioRepository.findByEmail(dto.getEmail()).isPresent()) {
-            throw new EmailDuplicadoException();
+            emailService.avisarRegistroConEmailExistente(dto.getEmail());
+            return;
         }
 
         Usuario nuevoUsuario = new Usuario();
         nuevoUsuario.setEmail(dto.getEmail());
         nuevoUsuario.setNombre(dto.getNombre());
-        nuevoUsuario.setPasswordHash(passwordEncoder.encode(dto.getPassword()));
+        nuevoUsuario.setPasswordHash(passwordHash);
         nuevoUsuario.setTipoNegocio(dto.getTipoNegocio());
 
         usuarioRepository.save(nuevoUsuario);

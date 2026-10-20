@@ -85,7 +85,7 @@ Validaciones: `nombre` obligatorio; `email` válido y obligatorio; `password` 8�
 
 Respuesta exitosa: `code: "USER_REGISTERED"`, `data: null`. El `tipoNegocio` enviado **se persiste** y aparecerá en el login.
 
-Errores: `422 EMAIL_DUPLICADO` si el correo ya existe; `400 VALIDATION_ERROR`.
+Errores: `400 VALIDATION_ERROR`. Un correo ya registrado responde igual que uno nuevo (`200 USER_REGISTERED`, anti-enumeración): no se crea ni modifica nada y el dueño recibe un aviso por email. Si el login posterior falla, el usuario debe revisar su correo o usar "recuperar contraseña".
 
 ### POST `/api/v1/usuarios/login`
 
@@ -480,7 +480,6 @@ Fuente de verdad de los códigos de error. El frontend ramifica **siempre por `c
 | 405 | `METHOD_NOT_ALLOWED` | Método HTTP no soportado por la ruta |
 | 415 | `UNSUPPORTED_MEDIA_TYPE` | `Content-Type` no soportado (usar `application/json`) |
 | 4xx | nombre del status HTTP | Otros errores de cliente detectados por el framework (p. ej. `BAD_REQUEST` por parámetro requerido faltante) |
-| 422 | `EMAIL_DUPLICADO` | Registro con correo ya existente |
 | 422 | `OTP_INVALIDO` | OTP incorrecto (o email inexistente) |
 | 422 | `OTP_EXPIRADO` | OTP vencido (>10 min) |
 | 429 | `OTP_BLOQUEADO` | Demasiados intentos OTP fallidos |

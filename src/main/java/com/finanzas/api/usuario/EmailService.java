@@ -25,4 +25,15 @@ public class EmailService {
         message.setText("Tu código de verificación de 6 dígitos es: " + otp + "\n\nEste código expirará en 10 minutos.");
         mailSender.send(message);
     }
+
+    @Async
+    public void avisarRegistroConEmailExistente(String email) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(email);
+        message.setSubject("Intento de registro con tu correo");
+        message.setText("Alguien intentó crear una cuenta con este correo, que ya está registrado.\n\n"
+                + "Si fuiste tú, inicia sesión o recupera tu contraseña desde la app. "
+                + "Si no fuiste tú, puedes ignorar este mensaje.");
+        mailSender.send(message);
+    }
 }
