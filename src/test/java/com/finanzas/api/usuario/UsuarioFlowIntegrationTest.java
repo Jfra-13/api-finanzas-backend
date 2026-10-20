@@ -71,6 +71,8 @@ class UsuarioFlowIntegrationTest extends IntegrationTestSupport {
 
         String login = "{\"email\":\"ana@test.com\",\"password\":\"WrongPass123\"}";
         mockMvc.perform(post(LOGIN).contentType(APPLICATION_JSON).content(login))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
+                .andExpect(jsonPath("$.message").value("Credenciales inválidas"));
     }
 }

@@ -118,15 +118,15 @@ class TransaccionCrudIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
-    void actualizar_deOtroUsuario_devuelve403() throws Exception {
+    void actualizar_deOtroUsuario_devuelve404() throws Exception {
         Usuario dueno = crearUsuario();
         Usuario intruso = crearUsuario();
         Transaccion tx = crearTransaccion(dueno, TipoTransaccion.INGRESO, "100.00", LocalDateTime.now(), null);
         String body = "{\"id\":" + tx.getId() + ",\"monto\":999.00,\"tipo\":\"EGRESO\"}";
 
         mockMvc.perform(put(TX + "/" + tx.getId()).header(AUTH, tokenDe(intruso)).contentType(APPLICATION_JSON).content(body))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("ACCESO_DENEGADO"));
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("TRANSACCION_NO_ENCONTRADA"));
     }
 
     @Test
@@ -155,14 +155,14 @@ class TransaccionCrudIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
-    void eliminar_deOtroUsuario_devuelve403() throws Exception {
+    void eliminar_deOtroUsuario_devuelve404() throws Exception {
         Usuario dueno = crearUsuario();
         Usuario intruso = crearUsuario();
         Transaccion tx = crearTransaccion(dueno, TipoTransaccion.INGRESO, "100.00", LocalDateTime.now(), null);
 
         mockMvc.perform(delete(TX + "/" + tx.getId()).header(AUTH, tokenDe(intruso)))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("ACCESO_DENEGADO"));
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("TRANSACCION_NO_ENCONTRADA"));
     }
 
     @Test

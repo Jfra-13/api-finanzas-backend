@@ -8,7 +8,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -94,12 +96,13 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<ErrorResponseDTO> handleAuthenticationException(AuthenticationException ex, HttpServletRequest request) {
-        log.error("Authentication error: {}", ex.getMessage());
+        // Fixed messages: the raw Spring Security text stays in the server log.
+        log.warn("Authentication error at {}: {}", request.getRequestURI(), ex.getMessage());
         ErrorResponseDTO response = ErrorResponseDTO.builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.UNAUTHORIZED.value())
                 .code("UNAUTHORIZED")
-                .message("Error de autenticación: " + ex.getMessage())
+                .message(ex instanceof BadCredentialsException ? "Credenciales inválidas" : "Autenticación requerida")
                 .path(request.getRequestURI())
                 .build();
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
@@ -120,6 +123,21 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponseDTO> handleGenericException(Exception ex, HttpServletRequest request) {
+        // Framework-detected client errors (unknown route, wrong method, wrong
+        // content type, missing param...) carry their own 4xx status: keep it
+        // instead of masking them as a 500.
+        if (ex instanceof ErrorResponse errorResponse && errorResponse.getStatusCode().is4xxClientError()) {
+            HttpStatus status = HttpStatus.valueOf(errorResponse.getStatusCode().value());
+            log.warn("Client error at {}: {}", request.getRequestURI(), ex.getMessage());
+            ErrorResponseDTO response = ErrorResponseDTO.builder()
+                    .timestamp(LocalDateTime.now())
+                    .status(status.value())
+                    .code(status.name())
+                    .message(status == HttpStatus.NOT_FOUND ? "Recurso no encontrado" : "Solicitud no válida para este recurso")
+                    .path(request.getRequestURI())
+                    .build();
+            return ResponseEntity.status(status).body(response);
+        }
         log.error("Unexpected error at {}: ", request.getRequestURI(), ex);
         ErrorResponseDTO response = ErrorResponseDTO.builder()
                 .timestamp(LocalDateTime.now())

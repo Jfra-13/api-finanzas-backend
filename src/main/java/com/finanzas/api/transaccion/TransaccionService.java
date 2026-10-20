@@ -9,7 +9,6 @@ import com.finanzas.api.transaccion.dto.TransaccionUpdateDTO;
 import com.finanzas.api.transaccion.model.Categoria;
 import com.finanzas.api.transaccion.model.TipoTransaccion;
 import com.finanzas.api.transaccion.model.Transaccion;
-import com.finanzas.api.shared.exception.specific.AccesoDenegadoException;
 import com.finanzas.api.shared.exception.specific.CategoriaNoEncontradaException;
 import com.finanzas.api.shared.exception.specific.MetaNoEncontradaException;
 import com.finanzas.api.shared.exception.specific.ParametroInvalidoException;
@@ -73,6 +72,9 @@ public class TransaccionService {
     // Daily profit quota driven by net profit. When meta/dias are null they are
     // resolved from the active Meta in the DB (goal amount + remaining working days).
     public BigDecimal obtenerCuotaDiaria(Long usuarioId, BigDecimal metaMensual, Integer diasRestantes) {
+        if (diasRestantes != null) {
+            ParametroInvalidoException.enRango("dias", diasRestantes, 0, 31);
+        }
         Optional<Meta> metaActiva = (metaMensual == null || diasRestantes == null)
                 ? metaService.obtenerMetaActual(usuarioId)
                 : Optional.empty();
@@ -222,7 +224,6 @@ public class TransaccionService {
         transaccionRepository.delete(transaccion);
     }
 
-    // 404 if it does not exist, 403 if it belongs to another user.
     // Null id leaves the movement uncategorized; a non-null id must point to a
     // base category or one owned by this user, otherwise 404.
     private Categoria resolverCategoria(Long usuarioId, Long categoriaId) {
@@ -233,13 +234,12 @@ public class TransaccionService {
                 .orElseThrow(CategoriaNoEncontradaException::new);
     }
 
+    // Another user's transaction is reported as missing (404, not 403) so ids
+    // cannot be probed to learn which ones exist.
     private Transaccion obtenerPropia(Long usuarioId, Long id) {
-        Transaccion transaccion = transaccionRepository.findById(id)
+        return transaccionRepository.findById(id)
+                .filter(t -> t.getUsuario().getId().equals(usuarioId))
                 .orElseThrow(TransaccionNoEncontradaException::new);
-        if (!transaccion.getUsuario().getId().equals(usuarioId)) {
-            throw new AccesoDenegadoException();
-        }
-        return transaccion;
     }
 
     private TransaccionResponseDTO toResponse(Transaccion t) {

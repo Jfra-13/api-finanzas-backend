@@ -50,7 +50,7 @@ public class MetaController {
 
     @Operation(summary = "Historial de metas mensuales",
             description = "CONTRATO: un item por mes CON meta registrada dentro de la ventana, ascendente por periodo. "
-                    + "'meses' = ventana hacia atrás incluyendo el mes en curso (default 6, mínimo 1). "
+                    + "'meses' = ventana hacia atrás incluyendo el mes en curso (default 6, rango 1-24; fuera de rango 400 PARAMETRO_INVALIDO). "
                     + "'utilidadReal' es utilidad NETA del mes (ingresos - egresos), calculada al momento; "
                     + "en el mes en curso compara lo acumulado hasta hoy. 'cumplida' = utilidadReal >= metaMensual. "
                     + "Sin metas en la ventana devuelve lista vacía, no 404.")

@@ -22,11 +22,16 @@ class AuthSecurityIntegrationTest extends IntegrationTestSupport {
     @Value("${jwt.secret}")
     private String secret;
 
+    // Same envelope as every other error, with a fixed message: the raw Spring
+    // Security exception text never reaches the client.
     @Test
     void sinToken_devuelve401() throws Exception {
         mockMvc.perform(get(PROTEGIDO))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
+                .andExpect(jsonPath("$.message").value("Autenticación requerida"))
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.path").value(PROTEGIDO));
     }
 
     @Test

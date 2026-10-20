@@ -41,19 +41,22 @@ public class UsuarioService {
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
+    private final LoginIntentos loginIntentos;
 
     public UsuarioService(UsuarioRepository usuarioRepository,
                           PasswordEncoder passwordEncoder,
                           EmailService emailService,
                           AuthenticationManager authenticationManager,
                           JwtService jwtService,
-                          RefreshTokenService refreshTokenService) {
+                          RefreshTokenService refreshTokenService,
+                          LoginIntentos loginIntentos) {
         this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
         this.emailService = emailService;
         this.authenticationManager = authenticationManager;
         this.jwtService = jwtService;
         this.refreshTokenService = refreshTokenService;
+        this.loginIntentos = loginIntentos;
     }
 
     @Transactional
@@ -72,9 +75,11 @@ public class UsuarioService {
     }
 
     public LoginResponseDTO login(LoginDTO dto) {
+        loginIntentos.reservar(dto.getEmail());
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(dto.getEmail(), dto.getPassword())
         );
+        loginIntentos.limpiar(dto.getEmail());
 
         UsuarioPrincipal userPrincipal = (UsuarioPrincipal) authentication.getPrincipal();
         Usuario usuario = userPrincipal.getUsuario();
@@ -141,10 +146,16 @@ public class UsuarioService {
         return true;
     }
 
+    // One live OTP per account: while a code is still valid, a new request is
+    // silently ignored. Re-issuing would reset the attempt counter and turn the
+    // 5-attempt lock into an unlimited brute force (and spam the inbox).
     @Transactional
     public void generarOtpRecuperacion(ForgotPasswordDTO dto) {
         usuarioRepository.findByEmail(dto.getEmail()).ifPresent(usuario -> {
-            String otp = String.format("%04d", SECURE_RANDOM.nextInt(10000));
+            if (usuario.getExpiracionOtp() != null && usuario.getExpiracionOtp().isAfter(LocalDateTime.now())) {
+                return;
+            }
+            String otp = String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
             usuario.setCodigoOtp(otp);
             usuario.setExpiracionOtp(LocalDateTime.now().plusMinutes(10));
             usuario.setIntentosOtp(0);
@@ -156,9 +167,13 @@ public class UsuarioService {
     public void verificarOtp(VerifyOtpDTO dto) {
         Usuario usuario = buscarParaOtp(dto.getEmail());
         validarOtp(usuario, dto.getOtp());
+        // A correct code gives the attempt back so verify + reset don't burn the lock.
+        usuarioRepository.liberarIntentoOtp(usuario.getId());
     }
 
-    @Transactional
+    // A wrong code must still commit the failed-attempt counter; rolling it back
+    // would disable the lockout for this endpoint.
+    @Transactional(noRollbackFor = OtpInvalidoException.class)
     public void resetPassword(ResetPasswordDTO dto) {
         Usuario usuario = buscarParaOtp(dto.getEmail());
         validarOtp(usuario, dto.getOtp());
@@ -168,6 +183,8 @@ public class UsuarioService {
         usuario.setExpiracionOtp(null);
         usuario.setIntentosOtp(0);
         usuarioRepository.save(usuario);
+        // New password ends every session opened with the old one.
+        refreshTokenService.revocarTodosDe(usuario.getId());
     }
 
     @Transactional
@@ -216,17 +233,17 @@ public class UsuarioService {
             throw new OtpInvalidoException();
         }
 
-        if (usuario.getIntentosOtp() >= MAX_OTP_ATTEMPTS) {
-            throw new OtpBloqueadoException();
-        }
-
         if (usuario.getExpiracionOtp().isBefore(LocalDateTime.now())) {
             throw new OtpExpiradoException();
         }
 
+        // Every guess reserves an attempt before the comparison, so a parallel
+        // burst cannot get more than MAX_OTP_ATTEMPTS guesses past the lock.
+        if (usuarioRepository.reservarIntentoOtp(usuario.getId(), MAX_OTP_ATTEMPTS) == 0) {
+            throw new OtpBloqueadoException();
+        }
+
         if (!usuario.getCodigoOtp().equals(otp)) {
-            usuario.setIntentosOtp(usuario.getIntentosOtp() + 1);
-            usuarioRepository.save(usuario);
             throw new OtpInvalidoException();
         }
     }

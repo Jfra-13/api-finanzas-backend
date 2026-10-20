@@ -51,8 +51,3 @@ src/main/resources/application-*.properties
 # ==========================================
 *.mv.db
 *.trace.db
-
-# ==========================================
-# CONFIG LOCAL DE HERRAMIENTAS - NO VERSIONAR
-# ==========================================
-CLAUDE.md

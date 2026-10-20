@@ -31,7 +31,7 @@ public class Usuario {
     private LocalDateTime fechaRegistro = LocalDateTime.now();
 
     // NUEVOS CAMPOS PARA SEGURIDAD OTP
-    @Column(name = "codigo_otp", length = 4)
+    @Column(name = "codigo_otp", length = 6)
     private String codigoOtp;
 
     @Column(name = "expiracion_otp")

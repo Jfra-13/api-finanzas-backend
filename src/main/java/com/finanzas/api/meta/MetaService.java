@@ -3,6 +3,7 @@ package com.finanzas.api.meta;
 import com.finanzas.api.meta.dto.MetaHistorialDTO;
 import com.finanzas.api.meta.dto.MetaRegistroDTO;
 import com.finanzas.api.meta.model.Meta;
+import com.finanzas.api.shared.exception.specific.ParametroInvalidoException;
 import com.finanzas.api.transaccion.TransaccionRepository;
 import com.finanzas.api.transaccion.model.TipoTransaccion;
 import com.finanzas.api.usuario.model.Usuario;
@@ -78,7 +79,7 @@ public class MetaService {
     // months with a registered goal produce an item, oldest first. Net profit is
     // computed on-the-fly per month; the current month compares month-to-date.
     public List<MetaHistorialDTO> historial(Long usuarioId, Integer meses) {
-        int n = Math.max(1, meses != null ? meses : 6);
+        int n = ParametroInvalidoException.enRango("meses", meses != null ? meses : 6, 1, 24);
         String periodoDesde = YearMonth.now().minusMonths(n - 1L).toString();
 
         return metaRepository

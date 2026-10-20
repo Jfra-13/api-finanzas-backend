@@ -83,7 +83,7 @@ public class AnaliticaController {
 
     @Operation(summary = "Tendencia con granularidad configurable",
             description = "granularidad=MES (default) rotula yyyy-MM; granularidad=SEMANA agrupa por semana ISO y "
-                    + "rotula con el lunes que la inicia (yyyy-MM-dd). ventana = cantidad de períodos (default 6, mínimo 1). "
+                    + "rotula con el lunes que la inicia (yyyy-MM-dd). ventana = cantidad de períodos (default 6; 1-24 con MES, 1-52 con SEMANA; fuera de rango 400 PARAMETRO_INVALIDO). "
                     + "El período en curso siempre es el último. Con MES y ventana=1 habilita la vista '1M'.")
     @GetMapping("/tendencia")
     public ResponseEntity<ApiResponseDTO<TendenciaDTO>> tendencia(
@@ -96,7 +96,7 @@ public class AnaliticaController {
 
     @Operation(summary = "Ingreso agregado por día de semana",
             description = "CONTRATO: siempre 7 items en orden fijo lunes→domingo, 'dia' en mayúsculas sin tildes "
-                    + "(LUNES..DOMINGO). ventana = semanas hacia atrás incluyendo la actual (default 4, mínimo 1).")
+                    + "(LUNES..DOMINGO). ventana = semanas hacia atrás incluyendo la actual (default 4, rango 1-52; fuera de rango 400 PARAMETRO_INVALIDO).")
     @GetMapping("/ingresos-por-dia-semana")
     public ResponseEntity<ApiResponseDTO<List<DiaSemanaIngresoDTO>>> ingresosPorDiaSemana(
             @AuthenticationPrincipal UsuarioPrincipal userPrincipal,

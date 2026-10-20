@@ -108,7 +108,7 @@ class PresupuestoIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
-    void eliminar_deOtroUsuario_devuelve403() throws Exception {
+    void eliminar_deOtroUsuario_devuelve404() throws Exception {
         Usuario dueno = crearUsuario();
         Usuario intruso = crearUsuario();
         Categoria gasolina = crearCategoria("Gasolina", TipoTransaccion.EGRESO, null);
@@ -117,8 +117,8 @@ class PresupuestoIntegrationTest extends IntegrationTestSupport {
         Presupuesto propio = presupuestoRepository.findByUsuarioId(dueno.getId()).get(0);
 
         mockMvc.perform(delete(PRES + "/" + propio.getId()).header(AUTH, tokenDe(intruso)))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("ACCESO_DENEGADO"));
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("PRESUPUESTO_NO_ENCONTRADO"));
     }
 
     @Test

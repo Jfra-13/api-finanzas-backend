@@ -108,7 +108,7 @@ Respuesta exitosa (`code: "LOGIN_SUCCESS"`):
 }
 ```
 
-Errores: `401 UNAUTHORIZED` con credenciales incorrectas.
+Errores: `401 UNAUTHORIZED` con credenciales incorrectas; `429 LOGIN_BLOQUEADO` tras 5 intentos fallidos en 15 minutos para ese email (rechaza incluso la password correcta hasta que vence la ventana; aplica igual a emails inexistentes).
 
 ### POST `/api/v1/usuarios/refresh`
 
@@ -127,13 +127,13 @@ Errores: `401 REFRESH_TOKEN_INVALIDO` (inexistente, expirado o ya usado).
 
 Request: `{ "email": "juan@correo.com" }`
 
-Siempre responde `200` con `code: "OTP_SENT"` exista o no el correo (anti-enumeración). Si existe, envía por email un OTP de 4 dígitos válido por 10 minutos.
+Siempre responde `200` con `code: "OTP_SENT"` exista o no el correo (anti-enumeración). Si existe, envía por email un OTP de 6 dígitos válido por 10 minutos. Mientras haya un código vigente, un nuevo pedido no genera ni reenvía otro (sigue respondiendo `200 OTP_SENT`).
 
 ### POST `/api/v1/usuarios/verify-otp`
 
-Request: `{ "email": "juan@correo.com", "otp": "1234" }`
+Request: `{ "email": "juan@correo.com", "otp": "123456" }`
 
-`otp`: exactamente 4 dígitos. Respuesta exitosa: `code: "OTP_VERIFIED"`. Este paso es opcional para UX (no consume el código).
+`otp`: exactamente 6 dígitos. Respuesta exitosa: `code: "OTP_VERIFIED"`. Este paso es opcional para UX (no consume el código).
 
 Errores: `422 OTP_INVALIDO` (código incorrecto **o email inexistente**, sin distinción), `422 OTP_EXPIRADO`, `429 OTP_BLOQUEADO` (tras 5 intentos fallidos).
 
@@ -141,7 +141,7 @@ Errores: `422 OTP_INVALIDO` (código incorrecto **o email inexistente**, sin dis
 
 Request:
 ```json
-{ "email": "juan@correo.com", "otp": "1234", "newPassword": "nueva1234" }
+{ "email": "juan@correo.com", "otp": "123456", "newPassword": "nueva1234" }
 ```
 
 `newPassword`: mínimo 8 caracteres. Vuelve a validar el OTP. Respuesta exitosa: `code: "PASSWORD_RESET_SUCCESS"`.
@@ -242,13 +242,13 @@ Actualiza una transacción propia. Mismo body que el registro **más** el campo 
 
 `categoriaId: null` quita la categoría del movimiento. Respuesta (`code: "TRANSACTION_UPDATED"`) devuelve la transacción actualizada (mismo shape que un item del historial).
 
-Errores: `404 TRANSACCION_NO_ENCONTRADA`, `403 ACCESO_DENEGADO` (la transacción es de otro usuario), `404 CATEGORIA_NO_ENCONTRADA`.
+Errores: `404 TRANSACCION_NO_ENCONTRADA` (inexistente **o de otro usuario**, sin distinción), `404 CATEGORIA_NO_ENCONTRADA`.
 
 ### DELETE `/api/v1/finanzas/transacciones/{id}`
 
 Elimina una transacción propia. Respuesta: `code: "TRANSACTION_DELETED"`, `data: null`.
 
-Errores: `404 TRANSACCION_NO_ENCONTRADA`, `403 ACCESO_DENEGADO`.
+Errores: `404 TRANSACCION_NO_ENCONTRADA` (inexistente o de otro usuario).
 
 ### GET `/api/v1/finanzas/hoy`
 
@@ -263,7 +263,7 @@ Cuánto debe ganar por día (en **utilidad neta**) para alcanzar la meta mensual
 | Query param | Tipo | Descripción |
 |---|---|---|
 | `meta` | decimal (opcional) | Meta mensual de utilidad |
-| `dias` | entero (opcional) | Días restantes |
+| `dias` | entero (opcional) | Días restantes, rango `0`-`31` |
 
 **Sin parámetros**, lee la meta y los días laborables restantes de la **meta persistida** del usuario (ver `POST /metas`). Pasar `meta`/`dias` los sobrescribe para el cálculo.
 
@@ -408,7 +408,7 @@ Ingresos/egresos totales de los últimos N meses (para gráfico de líneas). Arr
 
 | Query param | Tipo | Descripción |
 |---|---|---|
-| `meses` | entero (opcional) | Ventana de meses (default `6`) |
+| `meses` | entero (opcional) | Ventana de meses (default `6`, rango `1`-`24`) |
 
 Respuesta (`code: "MONTHLY_TREND_OK"`):
 ```json
@@ -466,18 +466,23 @@ Fuente de verdad de los códigos de error. El frontend ramifica **siempre por `c
 | 400 | `VALIDATION_ERROR` | Falla de validación de campos (trae `details[]`) |
 | 400 | `MALFORMED_JSON` | Body JSON mal formado |
 | 400 | `RANGO_FECHAS_INVALIDO` | `desde > hasta`, o fecha (`desde`/`hasta`) mal formada |
-| 400 | `PARAMETRO_INVALIDO` | Query param con tipo/formato inválido (que no sea fecha) |
+| 400 | `PARAMETRO_INVALIDO` | Query param con tipo/formato inválido (que no sea fecha) o fuera de rango: `meses` 1-24 (tendencia-mensual, metas/historial), `ventana` 1-24 con MES y 1-52 con SEMANA (tendencia), `ventana` 1-52 (ingresos-por-dia-semana), `dias` 0-31 (cuota-diaria, progreso-metas) |
 | 401 | `UNAUTHORIZED` | Sin token, token inválido/expirado, o credenciales incorrectas en login |
 | 401 | `REFRESH_TOKEN_INVALIDO` | Refresh token inexistente, expirado o ya usado (rotado) |
 | 401 | `CREDENCIALES_INVALIDAS` | Credenciales inválidas (variante explícita) |
-| 403 | `FORBIDDEN` / `ACCESO_DENEGADO` | Sin permisos / el recurso es de otro usuario |
+| 403 | `FORBIDDEN` / `ACCESO_DENEGADO` | Sin permisos (p. ej. editar o eliminar una categoría base). Un recurso de otro usuario responde 404, como si no existiera |
 | 404 | `USUARIO_NO_ENCONTRADO` | Usuario inexistente |
 | 404 | `TRANSACCION_NO_ENCONTRADA` | Transacción inexistente |
 | 404 | `META_NO_ENCONTRADA` | No hay meta activa este período |
 | 404 | `CATEGORIA_NO_ENCONTRADA` | Categoría inexistente o no visible |
 | 404 | `PRESUPUESTO_NO_ENCONTRADO` | Presupuesto inexistente |
+| 404 | `NOT_FOUND` | Ruta inexistente |
+| 405 | `METHOD_NOT_ALLOWED` | Método HTTP no soportado por la ruta |
+| 415 | `UNSUPPORTED_MEDIA_TYPE` | `Content-Type` no soportado (usar `application/json`) |
+| 4xx | nombre del status HTTP | Otros errores de cliente detectados por el framework (p. ej. `BAD_REQUEST` por parámetro requerido faltante) |
 | 422 | `EMAIL_DUPLICADO` | Registro con correo ya existente |
 | 422 | `OTP_INVALIDO` | OTP incorrecto (o email inexistente) |
 | 422 | `OTP_EXPIRADO` | OTP vencido (>10 min) |
 | 429 | `OTP_BLOQUEADO` | Demasiados intentos OTP fallidos |
+| 429 | `LOGIN_BLOQUEADO` | Demasiados logins fallidos para ese email; reintentar en 15 minutos |
 | 500 | `INTERNAL_SERVER_ERROR` | Error no controlado |
